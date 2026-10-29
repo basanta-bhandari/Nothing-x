@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nothingx-linux"
+version = "0.1.2"
+description = "Unofficial native Qt companion for CMF Buds Pro 2 on Linux"
+requires-python = ">=3.11"
+dependencies = ["PySide6-Essentials>=6.6,<7"]
+license = "MIT"
+
+[project.scripts]
+nothingx-linux = "nothingx.__main__:main"
+
+[tool.setuptools.package-data]
+nothingx = ["assets/cmf-buds-pro-2/*.png", "assets/cmf-buds-pro-2/*.json"]
+
+[tool.setuptools.packages.find]
+include = ["nothingx*"]

@@ -1,0 +1,69 @@
+{
+  "source_app": "Nothing X",
+  "package": "com.nothing.smartcenter",
+  "version": "3.10.1",
+  "version_code": 3100105,
+  "source_apk_sha256": "7511c66fe33bad1487a72cf0f1e1ad28e2e01ca9d9a7b422d963db95990072c9",
+  "assets": [
+    {
+      "file": "orange_left.png",
+      "apk_path": "res/drawable/os_espeon_orange_left.png",
+      "sha256": "a1cc6cfe03d08a171043d2c9b53829c35f67484090436e0d01c3184108ecc4f0"
+    },
+    {
+      "file": "orange_right.png",
+      "apk_path": "res/drawable/os_espeon_orange_right.png",
+      "sha256": "31330b39f2e37090a0e2d337427b4db3c6ff879bbe88adc0f2429b59e869bac3"
+    },
+    {
+      "file": "orange_case.png",
+      "apk_path": "res/drawable/os_espeon_orange_case.png",
+      "sha256": "9ac1b21edb7878d19f4bcfb6d79937928c1881825c4f3d98da3b61d218c31725"
+    },
+    {
+      "file": "black_left.png",
+      "apk_path": "res/drawable/os_espeon_black_left.png",
+      "sha256": "a8bbdb30116916da6446168190ed9707aab64bf7cf404959fa52f1226800eebd"
+    },
+    {
+      "file": "black_right.png",
+      "apk_path": "res/drawable/os_espeon_black_right.png",
+      "sha256": "5ffb90c345ffb632d43957d495ed9be1dfdb9e287ed1a9ba631c2893f391014f"
+    },
+    {
+      "file": "black_case.png",
+      "apk_path": "res/drawable/os_espeon_black_case.png",
+      "sha256": "dc40c6b1dd0eb2c6a34bb0f10540ed67d326b39cbdfe47984a7b622b37365b19"
+    },
+    {
+      "file": "white_left.png",
+      "apk_path": "res/drawable/os_espeon_white_left.png",
+      "sha256": "88d92cd879681a586b221c19ca776c2a09366a2fc548602154ec266675fb32fd"
+    },
+    {
+      "file": "white_right.png",
+      "apk_path": "res/drawable/os_espeon_white_right.png",
+      "sha256": "6015570fd7b6cf87e7c648dc1322b1896c802263c70a4453b8e61aac0b65c544"
+    },
+    {
+      "file": "white_case.png",
+      "apk_path": "res/drawable/os_espeon_white_case.png",
+      "sha256": "eed24f53cdd5e5933eaff5336035aa6fbd8222c8f86dafb5d5e41385403a376a"
+    },
+    {
+      "file": "blue_left.png",
+      "apk_path": "res/drawable/os_espeon_blue_left.png",
+      "sha256": "5aa63730ac3d817f8b1cf9cbdcc1573f41e874884d8aeacf05a2731110728afa"
+    },
+    {
+      "file": "blue_right.png",
+      "apk_path": "res/drawable/os_espeon_blue_right.png",
+      "sha256": "6aca685061ca850928fb650e3097150274ab4326ce96c691f6b1d30df3e64384"
+    },
+    {
+      "file": "blue_case.png",
+      "apk_path": "res/drawable/os_espeon_blue_case.png",
+      "sha256": "76f1938f7955e85213bafa5fcda7e55f1e7f61ee68239ae6187a8220639cfee7"
+    }
+  ]
+}
