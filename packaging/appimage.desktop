@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Nothing X Linux
+GenericName=CMF Earbud Controller
+Exec=nothingx-linux
+Icon=nothingx-linux
+Terminal=false
+Categories=AudioVideo;Audio;
+StartupNotify=true

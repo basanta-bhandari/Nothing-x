@@ -225,7 +225,6 @@ class MainWindow(QMainWindow):
         brand = label("NOTHING (X)")
         brand.setStyleSheet("font-family: monospace; font-size: 20px; font-weight: bold; background: transparent;")
         side.addWidget(brand)
-        side.addWidget(label("UNOFFICIAL / LINUX", "eyebrow"))
         side.addSpacing(38)
         self.pages = QStackedWidget()
         self.nav = []
@@ -240,9 +239,8 @@ class MainWindow(QMainWindow):
         self.side_status = label("○  Disconnected", "muted", True)
         side.addWidget(self.side_status)
         side.addSpacing(13)
-        self.demo_button = button("Explore demo", self.start_demo)
+        self.demo_button = button("Demo mode", self.start_demo)
         side.addWidget(self.demo_button)
-        side.addWidget(label("Built for CMF\nBuds Pro 2 · B172 / B187", "muted"))
         base.addWidget(sidebar)
         main = QWidget()
         content = QVBoxLayout(main)
@@ -250,7 +248,6 @@ class MainWindow(QMainWindow):
         content.setSpacing(16)
         header = QHBoxLayout()
         heading = QVBoxLayout()
-        heading.addWidget(label("YOUR LISTENING SPACE", "eyebrow"))
         self.page_title = label("Overview", "title")
         heading.addWidget(self.page_title)
         header.addLayout(heading)
@@ -288,9 +285,8 @@ class MainWindow(QMainWindow):
         self.sound_page()
         self.device_page()
         footer = QHBoxLayout()
-        self.status_text = label("Ready when you are.", "muted")
+        self.status_text = label("Disconnected", "muted")
         footer.addWidget(self.status_text, 1)
-        footer.addWidget(label("LOCAL BLUETOOTH · NO ACCOUNT", "eyebrow"))
         content.addLayout(footer)
 
     def page(self):
@@ -315,7 +311,7 @@ class MainWindow(QMainWindow):
         name = label("Buds Pro 2")
         name.setStyleSheet("font-size: 33px; font-weight: 650; background: transparent;")
         text.addWidget(name)
-        self.hero_status = label("Make yourself heard.\nMake the world quieter.", "muted", True)
+        self.hero_status = label("Disconnected", "muted", True)
         text.addWidget(self.hero_status)
         text.addStretch()
         appearance = QHBoxLayout()
@@ -342,7 +338,7 @@ class MainWindow(QMainWindow):
             self.batteries[key] = tile
             batteries.addWidget(tile)
         box.addLayout(batteries)
-        noise, n = card("Tune out. Tune in.", "Choose how much of the outside world comes through.")
+        noise, n = card("Noise control")
         self.anc_buttons = {}
         modes = QHBoxLayout()
         for title, value in [("Noise cancellation", "Adaptive"), ("Transparency", "Transparency"), ("Off", "Off")]:
@@ -374,16 +370,15 @@ class MainWindow(QMainWindow):
 
     def sound_page(self):
         box = self.page()
-        eq_card, e = card("Your sound, your way.", "EQ presets are processed on the earbuds and follow you across devices.")
+        eq_card, e = card("Equalizer")
         self.eq_select = QComboBox()
         self.eq_select.addItem("Waiting for device")
         self.eq_select.addItems(EQ)
         self.eq_select.activated.connect(lambda: self.change("eq", self.eq_select.currentText()))
         self.controls["eq"] = self.eq_select
         e.addWidget(self.eq_select)
-        e.addWidget(label("Custom EQ and gesture remapping are not available in this version.", "muted", True))
         box.addWidget(eq_card)
-        bass_card, b = card("Ultra Bass", "Add extra weight to the low end.")
+        bass_card, b = card("Ultra Bass")
         self.bass_toggle = Switch("Enable Ultra Bass")
         self.bass_toggle.clicked.connect(self.bass_changed)
         b.addWidget(self.bass_toggle)
@@ -399,8 +394,8 @@ class MainWindow(QMainWindow):
         bass_line.addWidget(self.bass_value)
         b.addLayout(bass_line)
         box.addWidget(bass_card)
-        extras, x = card("A different dimension")
-        self.toggle_row(x, "spatial", "Spatial audio", "A wider, more immersive sound stage.")
+        extras, x = card("Audio settings")
+        self.toggle_row(x, "spatial", "Spatial audio", "")
         self.toggle_row(x, "low_latency", "Low latency mode", "Reduce audio delay for games and video.")
         box.addWidget(extras)
         box.addStretch()
@@ -409,7 +404,8 @@ class MainWindow(QMainWindow):
         row = QHBoxLayout()
         words = QVBoxLayout()
         words.addWidget(label(title))
-        words.addWidget(label(detail, "muted", True))
+        if detail:
+            words.addWidget(label(detail, "muted", True))
         row.addLayout(words, 1)
         toggle = Switch()
         toggle.setAccessibleName(title)
@@ -421,7 +417,7 @@ class MainWindow(QMainWindow):
 
     def device_page(self):
         box = self.page()
-        settings, s = card("Made for your everyday")
+        settings, s = card("Device settings")
         self.toggle_row(s, "in_ear", "In-ear detection", "Pause automatically when you remove an earbud.")
         self.toggle_row(s, "dual", "Dual connection", "Keep two devices connected. Availability can depend on LDAC.")
         codec_line = QHBoxLayout()
@@ -466,7 +462,6 @@ class MainWindow(QMainWindow):
         self.minimize_tray = Switch("Keep running in the tray when closing the window")
         self.minimize_tray.setChecked(self.settings.value("tray", False, type=bool))
         i.addWidget(self.minimize_tray)
-        i.addWidget(label("Firmware updates remain available through the official Nothing X mobile app.", "muted", True))
         box.addWidget(info)
         box.addStretch()
 
@@ -562,7 +557,7 @@ class MainWindow(QMainWindow):
         ready = self.connection in ("connected", "demo") and known
         busy = bool(self.pending)
         self.refresh_button.setEnabled(self.connection in ("connected", "demo") and not busy)
-        self.hero_status.setText("Demo device · explore every setting" if self.connection == "demo" else "Connected to your listening space." if ready else "Connect your earbuds to get started.")
+        self.hero_status.setText("Demo mode" if self.connection == "demo" else "Connected" if ready else "Disconnected")
         for name, tile in self.batteries.items():
             tile.update_value(state.get("battery", {}).get(name))
         anc = state.get("anc")

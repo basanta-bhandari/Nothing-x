@@ -3,6 +3,8 @@ import queue
 import re
 import socket
 import subprocess
+import os
+import sys
 import threading
 import time
 
@@ -13,9 +15,16 @@ MAC = re.compile(r"(?:[0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}\Z")
 
 
 def paired_devices() -> list[tuple[str, str]]:
+    env = None
+    if getattr(sys, "frozen", False):
+        env = os.environ.copy()
+        if "LD_LIBRARY_PATH_ORIG" in env:
+            env["LD_LIBRARY_PATH"] = env["LD_LIBRARY_PATH_ORIG"]
+        else:
+            env.pop("LD_LIBRARY_PATH", None)
     try:
         result = subprocess.run(["bluetoothctl", "devices", "Paired"],
-                                capture_output=True, text=True, timeout=8)
+                                capture_output=True, text=True, timeout=8, env=env)
     except FileNotFoundError:
         raise RuntimeError("Install bluez-utils, then pair the earbuds in your Bluetooth settings.") from None
     if result.returncode:

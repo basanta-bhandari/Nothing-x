@@ -11,7 +11,7 @@ data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
 destination = data / "nothingx-linux"
 binary = Path.home() / ".local/bin/nothingx-linux"
 desktop = data / "applications/nothingx-linux.desktop"
-icon = data / "icons/hicolor/512x512/apps/nothingx-linux.png"
+icon = destination / "nothingx/assets/cmf-buds-pro-2/blue_case.png"
 
 
 def main():
@@ -20,6 +20,7 @@ def main():
                     ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
     for name in ("LICENSE", "NOTICE", "requirements.txt", "setup.sh", "run.sh"):
         shutil.copy2(source / name, destination / name)
+    shutil.copytree(source / "licenses", destination / "licenses", dirs_exist_ok=True)
     subprocess.run(["sh", str(destination / "setup.sh")], check=True)
     binary.parent.mkdir(parents=True, exist_ok=True)
     binary.write_text("#!/bin/sh\nexec " + shlex.quote(str(destination / "run.sh")) + ' "$@"\n')
@@ -27,9 +28,7 @@ def main():
     desktop.parent.mkdir(parents=True, exist_ok=True)
 
     executable = str(binary).replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`").replace("$", "\\$").replace("%", "%%")
-    desktop.write_text((source / "packaging/nothingx-linux.desktop").read_text().replace("Exec=nothingx-linux", f'Exec="{executable}"'))
-    icon.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source / "nothingx/assets/cmf-buds-pro-2/blue_case.png", icon)
+    desktop.write_text((source / "packaging/nothingx-linux.desktop").read_text().replace("Exec=nothingx-linux", f'Exec="{executable}"').replace("Icon=nothingx-linux", "Icon=" + str(icon)))
     print(f"Installed. Open Nothing X Linux in your application menu, or run {binary}")
 
 

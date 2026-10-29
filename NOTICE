@@ -2,6 +2,11 @@ Nothing X Linux is an unofficial project and is not affiliated with Nothing.
 Nothing, CMF, Nothing X, and Dirac are trademarks of their respective owners.
 The application icon also uses the original case render described below.
 
+The COSMIC applet links against libcosmic, licensed under MPL 2.0; its source
+is available at https://github.com/pop-os/libcosmic. The AppImage contains
+Qt and PySide6 components distributed under their applicable LGPL licenses.
+Copies of these licenses are in the licenses directory.
+
 The 12 PNG files in nothingx/assets/cmf-buds-pro-2/ are original Nothing/CMF
 product renders extracted unchanged from the user's own installed Nothing X
 3.10.1 (com.nothing.smartcenter, versionCode 3100105) for this personal client.

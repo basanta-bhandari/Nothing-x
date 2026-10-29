@@ -1,5 +1,5 @@
 pkgname=nothingx-linux
-pkgver=0.1.2
+pkgver=0.2.0
 pkgrel=1
 pkgdesc='Unofficial native Qt companion for CMF Buds Pro 2'
 arch=('any')
@@ -19,4 +19,6 @@ package() {
     install -Dm644 "$startdir/nothingx/assets/cmf-buds-pro-2/blue_case.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/nothingx-linux.png"
     install -Dm644 "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
     install -Dm644 "$startdir/NOTICE" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
+    install -dm755 "$pkgdir/usr/share/licenses/$pkgname/licenses"
+    install -m644 "$startdir"/licenses/* "$pkgdir/usr/share/licenses/$pkgname/licenses/"
 }

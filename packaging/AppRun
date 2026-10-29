@@ -1,0 +1,4 @@
+#!/bin/sh
+set -eu
+APP_ROOT=$(dirname -- "$(readlink -f -- "$0")")
+exec "$APP_ROOT/usr/bin/nothingx/nothingx" "$@"

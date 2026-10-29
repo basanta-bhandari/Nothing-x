@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.basanta_bhandari.NothingXApplet</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <name>Nothing X</name>
+  <summary>Control CMF Buds Pro 2 from the COSMIC panel</summary>
+  <description><p>View battery levels and control earbud settings.</p></description>
+  <url type="homepage">https://github.com/basanta-bhandari/Nothing-x</url>
+  <launchable type="desktop-id">io.github.basanta_bhandari.NothingXApplet.desktop</launchable>
+  <provides><id>com.system76.CosmicApplet</id><binary>cosmic-applet-nothingx</binary></provides>
+  <categories><category>COSMIC</category></categories>
+  <content_rating type="oars-1.1"/>
+</component>
