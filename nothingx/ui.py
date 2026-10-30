@@ -11,45 +11,10 @@ from .core import NativeClient
 from .protocol import ANC, EQ
 from .artwork import COLORS, DEFAULT_COLOR, device_pixmap, device_thumbnail
 
-ACCENT = "#ff6432"
-STYLE = """
-QWidget { background: #101112; color: #f1f1ed; font-family: 'Inter', 'Noto Sans', sans-serif; font-size: 14px; }
-QMainWindow { background: #101112; }
-QFrame#sidebar { background: #171819; border-right: 1px solid #2b2c2d; }
-QFrame#card { background: #1c1d1f; border: 1px solid #303133; border-radius: 16px; }
-QLabel, QCheckBox { background: transparent; }
-QLabel#muted { color: #969b9e; }
-QLabel#eyebrow { color: #ff7950; font-family: monospace; font-size: 11px; font-weight: 600; }
-QLabel#title { font-size: 31px; font-weight: 650; }
-QLabel#section { font-size: 18px; font-weight: 600; }
-QLabel#banner { padding: 12px 15px; background: #212629; border: 1px solid #3b4449; border-radius: 9px; }
-QPushButton { background: #292b2e; border: 1px solid #3a3c3e; padding: 10px 16px; border-radius: 9px; font-weight: 550; }
-QPushButton:hover { background: #36383a; border-color: #666; }
-QPushButton:pressed { background: #45474a; }
-QPushButton:checked { background: #f2653c; border-color: #f2653c; color: #111; }
-QPushButton:disabled { color: #626669; border-color: #303235; background: #202224; }
-QPushButton#primary { background: #ff6432; color: #101112; border: 0; }
-QPushButton#primary:hover { background: #ff8057; }
-QPushButton#nav { text-align: left; padding: 14px; border: 0; background: transparent; color: #a5a9aa; }
-QPushButton#nav:checked { background: #2b2522; color: #ff825b; }
-QPushButton#nav:hover { background: #262729; }
-QComboBox, QLineEdit, QSpinBox { background: #151618; border: 1px solid #45474a; border-radius: 7px; padding: 9px; min-height: 21px; selection-background-color: #ff6432; }
-QComboBox:disabled { color: #666; border-color: #303235; }
-QComboBox QAbstractItemView { background: #252729; selection-background-color: #86472e; padding: 5px; }
-QCheckBox { spacing: 10px; }
-QCheckBox::indicator { width: 38px; height: 22px; border-radius: 11px; background: #44484a; border: 1px solid #5c6063; }
-QCheckBox::indicator:checked { background: #ff6432; border-color: #ff6432; }
-QCheckBox::indicator:disabled { background: #292b2d; border-color: #36383a; }
-QSlider::groove:horizontal { background: #45484a; height: 5px; border-radius: 2px; }
-QSlider { background: transparent; }
-QSlider::sub-page:horizontal { background: #ff6432; border-radius: 2px; }
-QSlider::handle:horizontal { background: #f3f1ea; border: 3px solid #ff6432; width: 15px; height: 15px; margin: -8px 0; border-radius: 10px; }
-QScrollArea { border: 0; background: transparent; }
-QScrollBar:vertical { background: #151618; width: 8px; }
-QScrollBar::handle:vertical { background: #44474a; border-radius: 4px; min-height: 25px; }
-QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
-QToolTip { background: #303235; color: #eee; border: 1px solid #666; padding: 6px; }
-"""
+from .themes import DEFAULT_THEME, THEMES, stylesheet, theme_data
+from .components import DotLabel, palette
+
+STYLE = stylesheet()
 
 
 def label(text, role=None, wrap=False):
@@ -106,13 +71,13 @@ class BudsArt(QWidget):
         p.setPen(Qt.PenStyle.NoPen)
         for y in range(10, 200, 13):
             for x in range(8, 420, 13):
-                p.setBrush(QColor("#333334"))
+                p.setBrush(QColor(palette()["border"]))
                 p.drawEllipse(QPointF(x, y), 0.8, 0.8)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         for part, x in (("left", 20), ("right", 130)):
             p.drawPixmap(QRectF(x, 24, 90, 148), self.images[part], QRectF(127, 44, 258, 424))
         p.drawPixmap(QRectF(250, 16, 165, 165), self.images["case"], QRectF(64, 64, 384, 384))
-        p.setPen(QColor("#969b9e"))
+        p.setPen(QColor(palette()["muted"]))
         for text, x, width in (("L", 20, 90), ("R", 130, 90), ("CASE", 250, 165)):
             p.drawText(QRectF(x, 180, width, 20), Qt.AlignmentFlag.AlignCenter, text)
         p.end()
@@ -168,14 +133,14 @@ class Switch(QCheckBox):
             p.setOpacity(0.4)
         y = (self.height() - 22) / 2
         p.setPen(Qt.PenStyle.NoPen)
-        p.setBrush(QColor(ACCENT if self.isChecked() else "#4b4e51"))
+        p.setBrush(QColor(palette()["accent"] if self.isChecked() else palette()["border"]))
         p.drawRoundedRect(QRectF(0, y, 38, 22), 11, 11)
-        p.setBrush(QColor("#141414" if self.isChecked() else "#d5d7d8"))
+        p.setBrush(QColor(palette()["ink"] if self.isChecked() else palette()["text"]))
         p.drawEllipse(QRectF(19 if self.isChecked() else 3, y + 3, 16, 16))
-        p.setPen(QColor("#f1f1ed"))
+        p.setPen(QColor(palette()["text"]))
         p.drawText(QRectF(49, 0, max(0, self.width() - 49), self.height()), Qt.AlignmentFlag.AlignVCenter, self.text())
         if self.hasFocus():
-            p.setPen(QPen(QColor("#ffad7c"), 1, Qt.PenStyle.DotLine))
+            p.setPen(QPen(QColor(palette()["accent"]), 1, Qt.PenStyle.DotLine))
             p.setBrush(Qt.BrushStyle.NoBrush)
             p.drawRoundedRect(QRectF(0, y - 2, 40, 26), 12, 12)
         p.end()
@@ -188,6 +153,8 @@ class MainWindow(QMainWindow):
         self.resize(1140, 850)
         self.setMinimumSize(920, 680)
         self.settings = QSettings("NothingXLinux", "NothingXLinux")
+        self.theme_name = str(self.settings.value("theme", DEFAULT_THEME))
+        self.apply_theme(self.theme_name)
         self.product_color = str(self.settings.value("product_color", DEFAULT_COLOR))
         if self.product_color not in COLORS.values():
             self.product_color = DEFAULT_COLOR
@@ -222,6 +189,17 @@ class MainWindow(QMainWindow):
         self.refresh_timer.timeout.connect(self.refresh)
         self.refresh_timer.start()
 
+    def apply_theme(self, name):
+        self.theme_name = name if name in THEMES else DEFAULT_THEME
+        self.settings.setValue("theme", self.theme_name)
+        app = QApplication.instance()
+        app.setProperty("nothingx_theme", self.theme_name)
+        app.setStyleSheet(stylesheet(self.theme_name))
+        if hasattr(self, "theme_select"):
+            self.theme_select.setCurrentIndex(self.theme_select.findData(self.theme_name))
+        for widget in self.findChildren(QWidget):
+            widget.update()
+
     def _build(self):
         root = QWidget()
         self.setCentralWidget(root)
@@ -233,8 +211,7 @@ class MainWindow(QMainWindow):
         sidebar.setFixedWidth(205)
         side = QVBoxLayout(sidebar)
         side.setContentsMargins(19, 30, 19, 22)
-        brand = label("NOTHING (X)")
-        brand.setStyleSheet("font-family: monospace; font-size: 20px; font-weight: bold; background: transparent;")
+        brand = DotLabel("NOTHING X", 3)
         side.addWidget(brand)
         side.addSpacing(38)
         self.pages = QStackedWidget()
@@ -247,6 +224,15 @@ class MainWindow(QMainWindow):
             self.nav.append(b)
             side.addWidget(b)
         side.addStretch()
+        side.addWidget(label("THEME", "eyebrow"))
+        self.theme_select = QComboBox()
+        self.theme_select.setAccessibleName("Appearance theme")
+        for key, item in THEMES.items():
+            self.theme_select.addItem(item["name"], key)
+        self.theme_select.setCurrentIndex(self.theme_select.findData(self.theme_name))
+        self.theme_select.activated.connect(lambda: self.apply_theme(self.theme_select.currentData()))
+        side.addWidget(self.theme_select)
+        side.addSpacing(18)
         self.side_status = label("○  Disconnected", "muted", True)
         side.addWidget(self.side_status)
         side.addSpacing(13)

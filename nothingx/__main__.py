@@ -11,6 +11,8 @@ def main():
     parser.add_argument("--page", choices=("overview", "sound", "audio", "device"), default="overview")
     parser.add_argument("--screenshot", type=Path, help="Save a demo preview and exit (implies --demo)")
     parser.add_argument("--backend", choices=("cpp", "rust"), default=os.environ.get("NOTHINGX_BACKEND", "cpp"))
+    from .themes import THEMES
+    parser.add_argument("--theme", choices=tuple(THEMES))
     args = parser.parse_args()
     os.environ["NOTHINGX_BACKEND"] = args.backend
     try:
@@ -31,6 +33,8 @@ def main():
     app.setStyleSheet(STYLE)
     app.setWindowIcon(QIcon(str(ASSET_DIR / "blue_case.png")))
     window = MainWindow(demo=args.demo or bool(args.screenshot), auto_connect=args.connect)
+    if args.theme:
+        window.apply_theme(args.theme)
     window.navigate(("overview", "sound", "audio", "device").index(args.page))
     if args.screenshot:
         window.resize(1140, 950)
