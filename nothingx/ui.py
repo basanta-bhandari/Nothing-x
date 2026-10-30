@@ -16,6 +16,7 @@ from .components import DotLabel, BatteryRing, palette
 from .preferences import read_preferences, save_preferences
 from .models import MODELS, model_info
 from .discovery import Discovery
+from . import startup
 
 STYLE = stylesheet()
 
@@ -494,7 +495,20 @@ class MainWindow(QMainWindow):
         self.minimize_tray.setChecked(self.settings.value("tray", False, type=bool))
         i.addWidget(self.minimize_tray)
         box.addWidget(info)
+        startup_card, startup_layout = card("Startup")
+        self.startup_toggle = Switch("Open Nothing X at startup")
+        self.startup_toggle.setChecked(startup.enabled())
+        self.startup_toggle.clicked.connect(self.change_startup)
+        startup_layout.addWidget(self.startup_toggle)
+        box.addWidget(startup_card)
         box.addStretch()
+
+    def change_startup(self, enabled):
+        try:
+            startup.set_enabled(enabled)
+        except OSError as error:
+            self.startup_toggle.setChecked(startup.enabled())
+            self.show_message(f"Could not update startup settings: {error}", True)
 
     def _tray(self):
         self.tray = None

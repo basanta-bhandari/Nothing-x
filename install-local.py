@@ -1,41 +1,35 @@
 #!/usr/bin/env python3
-
+import argparse
 import os
 from pathlib import Path
 import shlex
 import shutil
 import subprocess
 
+from tools.install_support import copy_application
+from nothingx.startup import desktop_argument
+
 source = Path(__file__).resolve().parent
-data = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local/share"))
-destination = data / "nothingx-linux"
-binary = Path.home() / ".local/bin/nothingx-linux"
-desktop = data / "applications/nothingx-linux.desktop"
+parser = argparse.ArgumentParser()
+parser.add_argument("--backend", choices=("cpp", "rust"), default=os.environ.get("NOTHINGX_BACKEND", "cpp"))
+parser.add_argument("--prefix", type=Path)
+args = parser.parse_args()
+backend = args.backend
+prefix = args.prefix or Path.home() / ".local"
+data = prefix / "share"
+destination = data / f"nothingx-{backend}"
+copy_application(source, destination, backend, "manual")
+if not (destination / ".venv/bin/python").exists():
+    subprocess.run(["python3", "-m", "venv", str(destination / ".venv")], check=True)
+    subprocess.run([str(destination / ".venv/bin/python"), "-m", "pip", "install", "-r", str(source / "requirements.txt")], check=True)
+binary = prefix / "bin" / f"nothingx-{backend}"
+binary.parent.mkdir(parents=True, exist_ok=True)
+binary.write_text("#!/bin/sh\nexport NOTHINGX_BACKEND=" + backend + "\nexec " + shlex.quote(str(destination / "run.sh")) + ' "$@"\n')
+binary.chmod(0o755)
+desktop = data / "applications" / f"io.github.basanta_bhandari.NothingX.{backend}.desktop"
+desktop.parent.mkdir(parents=True, exist_ok=True)
 icon = destination / "nothingx/assets/cmf-buds-pro-2/blue_case.png"
-
-
-def main():
-    destination.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source / "nothingx", destination / "nothingx", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "bin"))
-    native_dir = destination / "nothingx/bin"
-    native_dir.mkdir(parents=True, exist_ok=True)
-    shutil.copy2(source / "nothingx/bin/nothingx-core", native_dir / ".nothingx-core.new")
-    os.replace(native_dir / ".nothingx-core.new", native_dir / "nothingx-core")
-    for name in ("LICENSE", "NOTICE", "requirements.txt", "setup.sh", "run.sh", "setup.py", "pyproject.toml", "MANIFEST.in"):
-        shutil.copy2(source / name, destination / name)
-    shutil.copytree(source / "licenses", destination / "licenses", dirs_exist_ok=True)
-    shutil.copytree(source / "native", destination / "native", dirs_exist_ok=True)
-    subprocess.run(["sh", str(destination / "setup.sh")], check=True)
-    binary.parent.mkdir(parents=True, exist_ok=True)
-    binary.write_text("#!/bin/sh\nexec " + shlex.quote(str(destination / "run.sh")) + ' "$@"\n')
-    binary.chmod(0o755)
-    desktop.parent.mkdir(parents=True, exist_ok=True)
-
-    executable = str(binary).replace("\\", "\\\\").replace('"', '\\"').replace("`", "\\`").replace("$", "\\$").replace("%", "%%")
-    desktop.write_text((source / "packaging/nothingx-linux.desktop").read_text().replace("Exec=nothingx-linux", f'Exec="{executable}"').replace("Icon=nothingx-linux", "Icon=" + str(icon)))
-    print(f"Installed. Open Nothing X Linux in your application menu, or run {binary}")
-
-
-if __name__ == "__main__":
-    main()
+desktop.write_text(f"[Desktop Entry]\nType=Application\nName=Nothing X ({'C++' if backend == 'cpp' else 'Rust'})\nGenericName=Nothing audio controls\nComment=Nothing and CMF earbuds and headphone settings\nExec={desktop_argument(binary)}\nIcon={icon}\nTerminal=false\nCategories=AudioVideo;Audio;Settings;\nKeywords=Nothing;Nothing X;CMF;Buds;Headphones;Bluetooth;\nStartupNotify=true\n")
+if shutil.which("update-desktop-database"):
+    subprocess.run(["update-desktop-database", str(desktop.parent)], check=False, capture_output=True)
+print(f"Installed {binary}. Search for Nothing X in your app launcher.")
