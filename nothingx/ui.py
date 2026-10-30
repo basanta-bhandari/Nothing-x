@@ -13,6 +13,7 @@ from .artwork import COLORS, DEFAULT_COLOR, device_pixmap, device_thumbnail
 
 from .themes import DEFAULT_THEME, THEMES, stylesheet, theme_data
 from .components import DotLabel, BatteryRing, palette
+from .preferences import read_preferences, save_preferences
 
 STYLE = stylesheet()
 
@@ -154,7 +155,7 @@ class MainWindow(QMainWindow):
         self.resize(1140, 850)
         self.setMinimumSize(920, 680)
         self.settings = QSettings("NothingXLinux", "NothingXLinux")
-        self.theme_name = str(self.settings.value("theme", DEFAULT_THEME))
+        self.theme_name = str(read_preferences().get("theme", self.settings.value("theme", DEFAULT_THEME)))
         self.apply_theme(self.theme_name)
         self.product_color = str(self.settings.value("product_color", DEFAULT_COLOR))
         if self.product_color not in COLORS.values():
@@ -198,6 +199,7 @@ class MainWindow(QMainWindow):
     def apply_theme(self, name):
         self.theme_name = name if name in THEMES else DEFAULT_THEME
         self.settings.setValue("theme", self.theme_name)
+        save_preferences(theme=self.theme_name)
         app = QApplication.instance()
         app.setProperty("nothingx_theme", self.theme_name)
         app.setStyleSheet(stylesheet(self.theme_name))

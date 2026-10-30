@@ -61,6 +61,41 @@ fn project_dir() -> PathBuf {
             data.join("nothingx-cosmic/app")
         })
 }
+fn theme_colors() -> (cosmic::iced::Color, cosmic::iced::Color) {
+    let config = std::env::var_os("NOTHINGX_PREFERENCES")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| {
+            std::env::var_os("XDG_CONFIG_HOME")
+                .map(PathBuf::from)
+                .unwrap_or_else(|| {
+                    PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".config")
+                })
+                .join("nothingx/preferences.json")
+        });
+    let preferences: Value = std::fs::read(config)
+        .ok()
+        .and_then(|data| serde_json::from_slice(&data).ok())
+        .unwrap_or_else(|| json!({}));
+    let registry: Value = std::fs::read(project_dir().join("nothingx/assets/themes/themes.json"))
+        .ok()
+        .and_then(|data| serde_json::from_slice(&data).ok())
+        .unwrap_or_else(|| json!({}));
+    let key = preferences["theme"].as_str().unwrap_or("nothing");
+    let chosen = registry["themes"].as_array().and_then(|themes| {
+        themes
+            .iter()
+            .find(|theme| theme["id"].as_str() == Some(key))
+    });
+    let color = |field: &str, fallback: u32| {
+        let rgb = chosen
+            .and_then(|theme| theme[field].as_str())
+            .and_then(|text| u32::from_str_radix(text.trim_start_matches('#'), 16).ok())
+            .unwrap_or(fallback);
+        cosmic::iced::Color::from_rgb8((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8)
+    };
+    (color("card", 0x171717), color("text", 0xf0efed))
+}
+
 fn bridge_subscription() -> Subscription<Message> {
     Subscription::run(|| {
         cosmic::iced::stream::channel(
@@ -543,10 +578,16 @@ impl cosmic::Application for Applet {
                 self.buds_controls()
             })
             .push(button::text("Open full settings").on_press(Message::OpenFull));
+        let (background, foreground) = theme_colors();
         self.core
             .applet
             .popup_container(
                 container(scrollable(content).height(Length::Shrink))
+                    .style(move |_| cosmic::iced::widget::container::Style {
+                        background: Some(background.into()),
+                        text_color: Some(foreground),
+                        ..Default::default()
+                    })
                     .padding(16)
                     .width(Length::Fixed(420.0))
                     .max_height(730.0),
