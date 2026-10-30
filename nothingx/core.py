@@ -5,12 +5,14 @@ import sys
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 
+from .variants import backend_path
+
 
 def executable():
     override = os.environ.get("NOTHINGX_CORE")
     if override:
         return Path(override)
-    return Path(__file__).resolve().parent / "bin/nothingx-core"
+    return backend_path(Path(__file__).resolve().parent)
 
 
 class NativeClient(QObject):

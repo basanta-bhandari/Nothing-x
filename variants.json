@@ -1,0 +1,57 @@
+{
+  "schema": 1,
+  "variants": [
+    {
+      "id": "cpp-portable",
+      "backend": "cpp",
+      "distribution": "portable",
+      "platforms": [
+        "linux",
+        "macos"
+      ]
+    },
+    {
+      "id": "cpp-applet",
+      "backend": "cpp",
+      "distribution": "applet",
+      "platforms": [
+        "linux-cosmic"
+      ]
+    },
+    {
+      "id": "cpp-manual",
+      "backend": "cpp",
+      "distribution": "manual",
+      "platforms": [
+        "linux",
+        "macos"
+      ]
+    },
+    {
+      "id": "rust-portable",
+      "backend": "rust",
+      "distribution": "portable",
+      "platforms": [
+        "linux",
+        "macos"
+      ]
+    },
+    {
+      "id": "rust-applet",
+      "backend": "rust",
+      "distribution": "applet",
+      "platforms": [
+        "linux-cosmic"
+      ]
+    },
+    {
+      "id": "rust-manual",
+      "backend": "rust",
+      "distribution": "manual",
+      "platforms": [
+        "linux",
+        "macos"
+      ]
+    }
+  ]
+}

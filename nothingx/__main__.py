@@ -1,4 +1,5 @@
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -9,7 +10,9 @@ def main():
     parser.add_argument("--connect", action="store_true", help="Connect to the saved earbuds on startup")
     parser.add_argument("--page", choices=("overview", "sound", "audio", "device"), default="overview")
     parser.add_argument("--screenshot", type=Path, help="Save a demo preview and exit (implies --demo)")
+    parser.add_argument("--backend", choices=("cpp", "rust"), default=os.environ.get("NOTHINGX_BACKEND", "cpp"))
     args = parser.parse_args()
+    os.environ["NOTHINGX_BACKEND"] = args.backend
     try:
         from PySide6.QtCore import QTimer
         from PySide6.QtGui import QIcon
