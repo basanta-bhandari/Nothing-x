@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nothingx-linux"
 version = "0.4.0"
-description = "Unofficial native Qt companion for CMF Buds Pro 2 on Linux"
+description = "Nothing and CMF audio controls for Linux and macOS"
 requires-python = ">=3.11"
 dependencies = ["PySide6-Essentials>=6.6,<7", "PySide6-Addons>=6.6,<7", "pyobjc-framework-IOBluetooth>=10; sys_platform == 'darwin'"]
 license = "MIT"

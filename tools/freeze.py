@@ -10,6 +10,7 @@ root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
 parser.add_argument("--backend", choices=("cpp", "rust"), required=True)
 parser.add_argument("--output", type=Path, required=True)
+parser.add_argument("--distribution", choices=("portable", "manual"), default="portable")
 args = parser.parse_args()
 backend = args.backend
 build = root / "build/freeze" / backend
@@ -19,9 +20,9 @@ if assets.exists():
 shutil.copytree(root / "nothingx/assets", assets, ignore=shutil.ignore_patterns("references", "build.json"))
 sys.path.insert(0, str(root))
 from nothingx import __version__
-(assets / "build.json").write_text(json.dumps({"backend": backend, "distribution": "portable", "version": __version__}) + "\n")
+(assets / "build.json").write_text(json.dumps({"backend": backend, "distribution": args.distribution, "version": __version__, **({"source": str(root)} if args.distribution == "manual" else {})}) + "\n")
 entry = build / "entry.py"
-entry.write_text(f'import os\nos.environ["NOTHINGX_BACKEND"] = "{backend}"\nos.environ["NOTHINGX_DISTRIBUTION"] = "portable"\nfrom nothingx.__main__ import main\nraise SystemExit(main())\n')
+entry.write_text(f'import os\nos.environ["NOTHINGX_BACKEND"] = "{backend}"\nos.environ["NOTHINGX_DISTRIBUTION"] = "{args.distribution}"\nfrom nothingx.__main__ import main\nraise SystemExit(main())\n')
 suffix = "dylib" if sys.platform == "darwin" else "so"
 library = root / "nothingx/bin" / f"libnothingx_{backend}.{suffix}"
 if not library.is_file():
@@ -32,5 +33,10 @@ for module in ("QtCore", "QtGui", "QtWidgets", "QtBluetooth", "QtNetwork"):
 command += ["--add-binary", f"{library}:nothingx/bin", "--add-data", f"{assets}:nothingx/assets"]
 for name in ("LICENSE", "NOTICE", "licenses"):
     command += ["--add-data", f"{root / name}:{'licenses' if name == 'licenses' else '.'}"]
+if sys.platform == "darwin":
+    command += ["--windowed", "--osx-bundle-identifier", f"io.github.basanta_bhandari.NothingX.{backend}", "--hidden-import", "IOBluetooth", "--hidden-import", "Foundation"]
+    icon = root / "build/icons/NothingX.icns"
+    if icon.is_file():
+        command += ["--icon", str(icon)]
 command += ["--distpath", str(args.output), "--workpath", str(build / "pyinstaller"), "--specpath", str(build), str(entry)]
 subprocess.run(command, check=True, cwd=root, env={**os.environ, "PYINSTALLER_CONFIG_DIR": str(build / "cache")})

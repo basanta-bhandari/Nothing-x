@@ -23,4 +23,14 @@ if [ ! -f "nothingx/bin/libnothingx_$NX_BACKEND.$NX_SUFFIX" ]; then
     exit 1
 fi
 export NOTHINGX_BACKEND=$NX_BACKEND
+if [ "$(uname -s)" = Darwin ] && [ "${NOTHINGX_SOURCE_UI:-0}" != 1 ]; then
+    NX_LABEL=Cpp
+    if [ "$NX_BACKEND" = rust ]; then NX_LABEL=Rust; fi
+    NX_APP="build/manual-$NX_BACKEND/Nothing X $NX_LABEL.app/Contents/MacOS/nothingx"
+    if [ ! -x "$NX_APP" ]; then
+        printf 'Build the macOS app with ./setup.sh --backend %s\n' "$NX_BACKEND" >&2
+        exit 1
+    fi
+    exec "$NX_APP" "$@"
+fi
 exec "$NX_PYTHON" -m nothingx "$@"

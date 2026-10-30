@@ -5,6 +5,7 @@ from pathlib import Path
 import shlex
 import shutil
 import subprocess
+import sys
 
 from tools.install_support import copy_application
 from nothingx.startup import desktop_argument
@@ -16,6 +17,23 @@ parser.add_argument("--prefix", type=Path)
 parser.add_argument("--distribution", choices=("manual", "applet"), default="manual")
 args = parser.parse_args()
 backend = args.backend
+if sys.platform == "darwin":
+    label = "Cpp" if backend == "cpp" else "Rust"
+    bundle = source / f"build/manual-{backend}/Nothing X {label}.app"
+    if not bundle.is_dir():
+        raise SystemExit(f"Run ./setup.sh --backend {backend} on this Mac first.")
+    destination = (args.prefix or Path.home()) / "Applications" / bundle.name
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    temporary = destination.with_name("." + bundle.name)
+    shutil.rmtree(temporary, ignore_errors=True)
+    subprocess.run(["ditto", str(bundle), str(temporary)], check=True)
+    previous = destination.with_name(bundle.name + ".previous")
+    shutil.rmtree(previous, ignore_errors=True)
+    if destination.exists():
+        destination.rename(previous)
+    temporary.rename(destination)
+    print(f"Installed {destination}. Open Nothing X from Spotlight.")
+    raise SystemExit(0)
 prefix = args.prefix or Path.home() / ".local"
 data = prefix / "share"
 destination = data / f"nothingx-{backend}-{args.distribution}"

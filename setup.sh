@@ -35,5 +35,13 @@ fi
 if [ "$NX_CYTHON" = 1 ]; then
     CFLAGS=${CFLAGS:--O2} .venv/bin/python setup.py build_ext --inplace
 fi
+if [ "$(uname -s)" = Darwin ]; then
+    .venv/bin/python -m pip install -r requirements-build.txt
+    for NX_BUILD in cpp rust; do
+        if [ "$NX_BACKEND" = all ] || [ "$NX_BACKEND" = "$NX_BUILD" ]; then
+            .venv/bin/python packaging/build-macos.py --backend "$NX_BUILD" --distribution manual --no-dmg
+        fi
+    done
+fi
 .venv/bin/python -c 'from PySide6.QtCore import qVersion; from PySide6.QtBluetooth import QBluetoothSocket; print("Nothing X runtime ready: Qt " + qVersion())'
 printf 'Start with ./run.sh --backend %s\n' "$NX_BACKEND"

@@ -10,3 +10,4 @@ pkg/
 *.pkg.tar.*
 target/
 *.so
+*.dylib

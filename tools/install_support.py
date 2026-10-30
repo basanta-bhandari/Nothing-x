@@ -22,9 +22,9 @@ def copy_application(source, target, backend, distribution):
         raise RuntimeError(f"Build the {backend} backend first: ./setup.sh --backend {backend}")
     for extension in (source / "nothingx").glob("*.so"):
         atomic_copy(extension, target / "nothingx" / extension.name)
-    for name in ("run.sh", "run-cpp.sh", "run-rust.sh", "setup.sh", "setup.py", "pyproject.toml", "requirements.txt", "MANIFEST.in", "LICENSE", "NOTICE", "variants.json"):
+    for name in ("run.sh", "run-cpp.sh", "run-rust.sh", "setup.sh", "setup.py", "pyproject.toml", "requirements.txt", "requirements-build.txt", "MANIFEST.in", "LICENSE", "NOTICE", "variants.json"):
         atomic_copy(source / name, target / name)
-    for directory in ("licenses", "native", "rust-engine", "tools"):
+    for directory in ("licenses", "native", "rust-engine", "tools", "packaging"):
         shutil.copytree(source / directory, target / directory, dirs_exist_ok=True, ignore=shutil.ignore_patterns("target", "__pycache__", "*.pyc"))
     from nothingx import __version__
     (target / "nothingx/assets/build.json").write_text(json.dumps({"backend": backend, "distribution": distribution, "version": __version__, "source": str(source)}) + "\n")
