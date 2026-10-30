@@ -4,6 +4,7 @@ import time
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from .engine import Engine
+from .platform_audio import make_audio
 
 READ_KEYS = ("battery", "anc", "eq", "low_latency", "bass", "spatial", "in_ear", "dual", "codec", "firmware", "model")
 DEMO_PAYLOADS = {
@@ -22,6 +23,8 @@ class Service(QObject):
         super().__init__(parent)
         self.engine = Engine(backend)
         self.backend = backend
+        self.audio = make_audio(self)
+        self.audio.event.connect(self.event)
         self.phase = "disconnected"
         self.transport = None
         self.sequence = 0
@@ -298,6 +301,9 @@ class Service(QObject):
                 self.write(request.get("key", ""), request.get("value"))
             elif action == "refresh":
                 self.refresh()
+                self.audio.refresh()
+            elif action == "audio":
+                self.audio.request(request.get("key", "refresh"), request.get("value"), request.get("target"))
             elif action == "demo":
                 self.start_demo()
             elif action == "devices":
@@ -315,6 +321,7 @@ class Service(QObject):
         if not self.closed:
             self.disconnect()
             self.timer.stop()
+            self.audio.close()
             self.engine.close()
             self.closed = True
             self.finished.emit()
