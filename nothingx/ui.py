@@ -1,5 +1,5 @@
 from PySide6.QtCore import Qt, QSettings, QTimer, QRectF, QPointF, QSize
-from PySide6.QtGui import QColor, QIcon, QPainter, QPen
+from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabel,
     QPushButton, QCheckBox, QComboBox, QSpinBox, QSlider, QHBoxLayout, QVBoxLayout,
     QScrollArea, QStackedWidget, QLineEdit, QMessageBox, QSystemTrayIcon,
@@ -150,7 +150,7 @@ class Switch(QCheckBox):
 class MainWindow(QMainWindow):
     def __init__(self, demo=False, auto_connect=False):
         super().__init__()
-        self.setWindowTitle("Nothing X · Linux")
+        self.setWindowTitle("Nothing X")
         self.resize(1140, 850)
         self.setMinimumSize(920, 680)
         self.settings = QSettings("NothingXLinux", "NothingXLinux")
@@ -176,6 +176,11 @@ class MainWindow(QMainWindow):
         self.audio = AudioWorker(self.backend_client, str(self.settings.value("address", "")), self)
         self.audio.message.connect(self.show_message)
         self._build()
+        for number in range(4):
+            shortcut = QShortcut(QKeySequence(f"Ctrl+{number + 1}"), self)
+            shortcut.activated.connect(lambda index=number: self.navigate(index))
+        QShortcut(QKeySequence("Ctrl+R"), self).activated.connect(self.refresh)
+        QShortcut(QKeySequence("Ctrl+Q"), self).activated.connect(self.quit)
         self.demo_button.setVisible(demo)
         self._tray()
         self.worker.start()
@@ -563,7 +568,7 @@ class MainWindow(QMainWindow):
 
     def show_message(self, text, error=False):
         self.banner.setText(text)
-        self.banner.setStyleSheet("background: #35221e; border-color: #81503e;" if error else "")
+        self.banner.setStyleSheet(f"border-color: {palette()['accent']};" if error else "")
         self.banner.setVisible(error or self.connection not in ("connected", "demo") or text.startswith("DEMO"))
         self.status_text.setText(text)
 

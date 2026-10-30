@@ -28,6 +28,7 @@ class AudioPage(QWidget):
         self.profile_hint = label("", "muted", True)
         layout.addWidget(self.profile_hint)
         self.auto_headset_row = QWidget()
+        self.auto_headset_row.setStyleSheet("background: transparent;")
         headset_row = QHBoxLayout(self.auto_headset_row)
         headset_row.setContentsMargins(0, 0, 0, 0)
         headset_row.addWidget(label("Allow headset mode for the buds’ microphone", wrap=True), 1)
@@ -151,6 +152,8 @@ class AudioPage(QWidget):
             while self.apps.count() > 1:
                 item = self.apps.takeAt(1)
                 if item.widget():
+                    for timer in item.widget().findChildren(QTimer):
+                        timer.stop()
                     item.widget().deleteLater()
             self.stream_widgets = {}
             if not state.get("streams"):
@@ -172,6 +175,7 @@ class AudioPage(QWidget):
     def add_stream(self, stream):
         key = f'{stream["kind"]}:{stream["index"]}'
         item = QWidget()
+        item.setStyleSheet("background: transparent;")
         box = QVBoxLayout(item)
         box.setContentsMargins(0, 5, 0, 10)
         title = label("")
