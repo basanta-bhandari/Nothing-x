@@ -14,7 +14,7 @@ license = "MIT"
 nothingx-linux = "nothingx.__main__:main"
 
 [tool.setuptools.package-data]
-nothingx = ["assets/cmf-buds-pro-2/*.png", "assets/cmf-buds-pro-2/*.json", "bin/nothingx-core", "bin/libnothingx_*", "assets/themes/*.json", "assets/themes/references/*"]
+nothingx = ["assets/cmf-buds-pro-2/*.png", "assets/cmf-buds-pro-2/*.json", "bin/nothingx-core", "bin/libnothingx_*", "assets/models.json", "assets/devices/*", "assets/themes/*.json", "assets/themes/references/*"]
 
 [tool.setuptools.packages.find]
 include = ["nothingx*"]

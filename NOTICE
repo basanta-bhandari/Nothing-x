@@ -77,3 +77,9 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+Additional product renders in nothingx/assets/devices are unchanged Nothing X
+artwork supplied with the same application version identified above. Their
+source paths and hashes are recorded in that directory's provenance.json.
+The supplied design reference images in nothingx/assets/themes/references
+remain the property of their respective creators and are not covered by MIT.

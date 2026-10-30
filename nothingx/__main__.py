@@ -5,12 +5,14 @@ from pathlib import Path
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Unofficial Nothing X desktop companion for CMF Buds Pro 2")
+    parser = argparse.ArgumentParser(description="Nothing and CMF audio controls for Linux and macOS")
     parser.add_argument("--demo", action="store_true", help="Use a simulated device; no Bluetooth access")
     parser.add_argument("--connect", action="store_true", help="Connect to the saved earbuds on startup")
     parser.add_argument("--page", choices=("overview", "sound", "audio", "device"), default="overview")
     parser.add_argument("--screenshot", type=Path, help="Save a demo preview and exit (implies --demo)")
     parser.add_argument("--backend", choices=("cpp", "rust"), default=os.environ.get("NOTHINGX_BACKEND", "cpp"))
+    from .models import MODELS
+    parser.add_argument("--demo-model", choices=tuple(MODELS), default="B172")
     from .themes import THEMES
     parser.add_argument("--theme", choices=tuple(THEMES))
     args = parser.parse_args()
@@ -28,11 +30,11 @@ def main():
     from .ui import MainWindow, STYLE
     from .artwork import ASSET_DIR
     app = QApplication(sys.argv[:1])
-    app.setApplicationName("Nothing X Linux")
+    app.setApplicationName("Nothing X")
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
     app.setWindowIcon(QIcon(str(ASSET_DIR / "blue_case.png")))
-    window = MainWindow(demo=args.demo or bool(args.screenshot), auto_connect=args.connect)
+    window = MainWindow(demo=args.demo or bool(args.screenshot), auto_connect=args.connect, demo_model=args.demo_model)
     if args.theme:
         window.apply_theme(args.theme)
     window.navigate(("overview", "sound", "audio", "device").index(args.page))

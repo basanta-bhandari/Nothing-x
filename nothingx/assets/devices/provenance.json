@@ -1,0 +1,95 @@
+{
+  "source_app": "Nothing X 3.10.1",
+  "assets": [
+    {
+      "file": "ear1_left.png",
+      "source": "res/drawable/os_device_ear_one_black_left.png",
+      "sha256": "f473ce1472f5882d6365eefb0dc649a7b5b89f7617b8a221966bd04eaa52e900"
+    },
+    {
+      "file": "ear1_right.png",
+      "source": "res/drawable/os_device_ear_one_black_right.png",
+      "sha256": "150279498b258eac62bc9692615bb557353b6a452b003d4b0c98db123d45edf6"
+    },
+    {
+      "file": "ear1_case.png",
+      "source": "res/drawable/os_device_ear_one_black_case_disconnected.png",
+      "sha256": "1d75b0b2a819e9a7a1ef3a068a3d02faa16083a9cad8e500a236a7943dfb93c0"
+    },
+    {
+      "file": "ear2_left.png",
+      "source": "res/drawable/os_device_ear_two_black_left.png",
+      "sha256": "6348fa91324ddbf48137339620f30534deca1b0a6e05c5375dddb7cca8d5f264"
+    },
+    {
+      "file": "ear2_right.png",
+      "source": "res/drawable/os_device_ear_two_black_right.png",
+      "sha256": "88bdc317c25a3a61f35379062137796581f816a5ae39a9fb34300d5196285433"
+    },
+    {
+      "file": "ear2_case.png",
+      "source": "res/drawable/os_device_ear_two_black_case_disconnected.png",
+      "sha256": "30b4315b8835efa30d65c44028920cf63741507915dca265ed373f503f6e38b3"
+    },
+    {
+      "file": "stick_left.png",
+      "source": "res/drawable/os_device_ear_stick_left.png",
+      "sha256": "61a0cd2796dd8c1238306aab0dceb1de2c3ae79432c15e396e9cfc8e7a552c5d"
+    },
+    {
+      "file": "stick_right.png",
+      "source": "res/drawable/os_device_ear_stick_right.png",
+      "sha256": "ec099f30ec1759c55a2f6208c6e7b570d6fc3df13e7ad728c06828a65bc8f7bc"
+    },
+    {
+      "file": "stick_case.png",
+      "source": "res/drawable/os_device_ear_stick_case_disconnected.png",
+      "sha256": "eac8cd26d8cbb01f324945a0e2d6deba22a355f4bce8b0e06fde03aa302e9627"
+    },
+    {
+      "file": "ear_left.png",
+      "source": "res/drawable/os_ear_twos_blcak_left.png",
+      "sha256": "74e0ef01e8464eb76f3a8eae9aef979cb3773c4b25a1f6ee3b50bb6b4bb8272d"
+    },
+    {
+      "file": "ear_right.png",
+      "source": "res/drawable/os_ear_twos_blcak_right.png",
+      "sha256": "0b8fe380e98954360a0b8828865f7b714bc8df26c8efdd9e059941f4b7b8cee0"
+    },
+    {
+      "file": "ear_case.png",
+      "source": "res/drawable/os_ear_twos_blcak_disconnect.png",
+      "sha256": "41fa7be98f289f2594c8a638893b6c7934bdaa25cc6e5b9287d61afa4b1027a1"
+    },
+    {
+      "file": "eara_left.png",
+      "source": "res/drawable/os_ear_color_black_left.png",
+      "sha256": "131794112ef03ba795db885ff2512c8df4b04d56fc870c83ece06c5685f5d67e"
+    },
+    {
+      "file": "eara_right.png",
+      "source": "res/drawable/os_ear_color_black_right.png",
+      "sha256": "2fcd19da51864b134f945b74af91c848ab9a9b6cf42a0fbc9f6e32ca477d37e4"
+    },
+    {
+      "file": "eara_case.png",
+      "source": "res/drawable/os_ear_color_black_disconnect.png",
+      "sha256": "8e5c5e19f43a201501f8c95d27c890077eaf36347cc5efd0c1422f23fb406443"
+    },
+    {
+      "file": "headphone1_headphone.png",
+      "source": "res/drawable/elekid_black.png",
+      "sha256": "c00aab5ec6ed8953c191b50889039e4b1a54e0d5f01dafc235b7738548e92bd0"
+    },
+    {
+      "file": "neckband_headphone.png",
+      "source": "res/drawable/crobat_black.png",
+      "sha256": "d977be6802b3009fa8a7aed8fe6db809cc91b7e097d37006a957f86e47f8f49d"
+    },
+    {
+      "file": "cmf-headphone_headphone.png",
+      "source": "res/drawable/forretress_dark_grey.png",
+      "sha256": "c3ef30b2f421bcaa390983130ce8374ecc23be46f6c08ba5d1e8e02c50e77949"
+    }
+  ]
+}

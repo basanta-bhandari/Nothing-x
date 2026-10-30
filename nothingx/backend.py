@@ -41,6 +41,8 @@ class Worker(QObject):
         request = {"action": action}
         if action == "connect":
             request.update(address=args[0], channel=args[1] if len(args) > 1 else 0)
+        elif action == "demo" and args:
+            request["model"] = args[0]
         elif action == "write":
             request.update(key=args[0], value=args[1])
         self.client.send(request)

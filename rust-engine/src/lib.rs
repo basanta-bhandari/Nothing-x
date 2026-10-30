@@ -7,6 +7,7 @@ use std::{
 #[derive(Default)]
 struct Engine {
     state: Value,
+    profiles: Value,
     buffer: Vec<u8>,
 }
 fn object() -> Value {
@@ -86,7 +87,7 @@ fn write(key: &str, value: &Value) -> Result<(u16, Vec<u8>), String> {
     }
     if key == "find" && value.as_array().is_some_and(|a| a.len() == 2) {
         if let (Some(side), Some(enabled)) = (
-            value[0].as_u64().filter(|v| *v == 2 || *v == 3),
+            value[0].as_u64().filter(|v| *v == 2 || *v == 3 || *v == 6),
             value[1].as_bool(),
         ) {
             return Ok((0xf002, vec![side as u8, u8::from(enabled)]));
@@ -206,15 +207,14 @@ fn parse(command: u16, p: &[u8]) -> Value {
                 json!(String::from_utf8_lossy(p).trim_matches(['\0', '\r', '\n', ' ']))
         }
         0xc01c if !p.is_empty() => {
-            out["model"] = json!(if p == [0x72, 0xb1] {
-                "B172".into()
-            } else if p == [0x87, 0xb1] {
-                "B187".into()
+            out["model"] = json!(if p.len() == 2 && p[1] & 0xf0 >= 0xb0 {
+                format!("{:02X}{:02X}", p[1], p[0])
             } else {
-                String::from_utf8_lossy(p)
-                    .trim_matches(['\0', '\r', '\n', ' '])
-                    .to_uppercase()
-            })
+                p.iter()
+                    .filter(|b| b.is_ascii_graphic() || **b == b' ')
+                    .map(|b| (*b as char).to_ascii_uppercase())
+                    .collect::<String>()
+            });
         }
         _ => {}
     }
@@ -224,11 +224,35 @@ impl Engine {
     fn new() -> Self {
         Self {
             state: object(),
+            profiles: object(),
             buffer: vec![],
         }
     }
     fn apply(&mut self, command: u16, payload: &[u8]) {
         let mut update = parse(command, payload);
+        let profile = self
+            .profiles
+            .get(self.state["model"].as_str().unwrap_or(""))
+            .cloned()
+            .unwrap_or_else(object);
+        if matches!(command, 0xc050 | 0xc01f)
+            && !payload.is_empty()
+            && !profile.as_object().is_none_or(|p| p.is_empty())
+        {
+            let offset = profile["eq_index"].as_u64().unwrap_or(0) as usize;
+            let value = payload.get(offset).copied().unwrap_or(payload[0]);
+            let name = profile["eq_presets"]
+                .as_array()
+                .and_then(|presets| {
+                    presets
+                        .iter()
+                        .find(|p| p["value"].as_u64() == Some(value as u64))
+                })
+                .and_then(|p| p["name"].as_str())
+                .map(str::to_string)
+                .unwrap_or_else(|| format!("Device preset {value}"));
+            update["eq"] = json!(name);
+        }
         if let Some(incoming) = update.get("battery").cloned() {
             let mut battery = self.state.get("battery").cloned().unwrap_or_else(object);
             for part in ["left", "right", "case", "headphone"] {
@@ -246,10 +270,28 @@ impl Engine {
         for (key, value) in update.as_object().unwrap() {
             self.state[key] = value.clone()
         }
+        if let Some(model) = self.state["model"]
+            .as_str()
+            .map(str::to_string)
+            .filter(|m| !m.is_empty())
+        {
+            let profile = self.profiles.get(&model).cloned().unwrap_or_else(
+                || json!({"id":model,"name":"Nothing audio device","kind":"unknown","features":[]}),
+            );
+            self.state["capabilities"] = profile
+                .get("features")
+                .cloned()
+                .unwrap_or_else(|| json!([]));
+            self.state["device"] = profile;
+        }
     }
     fn call(&mut self, request: &Value) -> Result<Value, String> {
         let op = request["op"].as_str().unwrap_or("");
         match op {
+            "configure" => {
+                self.profiles = request["profiles"].clone();
+                Ok(object())
+            }
             "reset" => {
                 self.state = object();
                 self.buffer.clear();
@@ -300,6 +342,11 @@ impl Engine {
             }
             "read" | "write" | "packet" => {
                 let key = request["key"].as_str().unwrap_or("");
+                let profile = self
+                    .profiles
+                    .get(self.state["model"].as_str().unwrap_or(""))
+                    .cloned()
+                    .unwrap_or_else(object);
                 let (command, payload) = match op {
                     "packet" => (
                         request["command"]
@@ -308,15 +355,62 @@ impl Engine {
                             .ok_or("Invalid command")? as u16,
                         bytes(&request["payload"])?,
                     ),
-                    "read" => read(key)?,
+                    "read" => {
+                        let mut command = read(key)?;
+                        if key == "eq" {
+                            if let Some(id) = profile["eq_read"].as_u64() {
+                                command.0 = id as u16
+                            }
+                        }
+                        command
+                    }
                     _ => {
-                        if !matches!(self.state["model"].as_str(), Some("B172" | "B187")) {
-                            return Err("Device model is not configured for writes".into());
+                        let value = &request["value"];
+                        if !profile["features"]
+                            .as_array()
+                            .is_some_and(|keys| keys.iter().any(|v| v.as_str() == Some(key)))
+                        {
+                            return Err("This model does not support that control".into());
                         }
                         if key != "find" && self.state.get(key).is_none() {
                             return Err("The device has not reported this setting".into());
                         }
-                        write(key, &request["value"])?
+                        if key == "anc"
+                            && !profile["anc_modes"]
+                                .as_array()
+                                .is_some_and(|modes| modes.contains(value))
+                        {
+                            return Err("Noise mode not supported by this model".into());
+                        }
+                        if key == "bass"
+                            && value[1].as_f64().unwrap_or(0.0)
+                                > profile["bass_max"].as_f64().unwrap_or(5.0)
+                        {
+                            return Err("Bass level outside this model's range".into());
+                        }
+                        if key == "eq" {
+                            let preset = profile["eq_presets"]
+                                .as_array()
+                                .and_then(|values| values.iter().find(|p| p["name"] == *value))
+                                .ok_or("Equalizer preset not supported by this model")?;
+                            (
+                                profile["eq_write"].as_u64().unwrap_or(0xf010) as u16,
+                                vec![preset["value"].as_u64().unwrap_or(0) as u8, 0],
+                            )
+                        } else {
+                            let mut command = write(key, value)?;
+                            if key == "find" {
+                                let single = profile["kind"].as_str() != Some("earbuds");
+                                let side = value[0].as_u64().unwrap_or(0);
+                                if (single && side != 6) || (!single && side == 6) {
+                                    return Err("Invalid locator target for this model".into());
+                                }
+                                if profile["ring_legacy"].as_bool() == Some(true) {
+                                    command.1 = vec![u8::from(value[1].as_bool().unwrap_or(false))]
+                                }
+                            }
+                            command
+                        }
                     }
                 };
                 let sequence = request.get("sequence").and_then(Value::as_u64).unwrap_or(1);

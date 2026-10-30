@@ -14,6 +14,8 @@ from .artwork import COLORS, DEFAULT_COLOR, device_pixmap, device_thumbnail
 from .themes import DEFAULT_THEME, THEMES, stylesheet, theme_data
 from .components import DotLabel, BatteryRing, palette
 from .preferences import read_preferences, save_preferences
+from .models import MODELS, model_info
+from .discovery import Discovery
 
 STYLE = stylesheet()
 
@@ -53,6 +55,7 @@ class BudsArt(QWidget):
 
     def __init__(self, color=DEFAULT_COLOR):
         super().__init__()
+        self.model = "B172"
         self.setMinimumSize(290, 175)
         self.setStyleSheet("background: transparent;")
         self.setSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Expanding)
@@ -60,8 +63,13 @@ class BudsArt(QWidget):
 
     def set_color(self, color):
         self.color = color
-        self.images = {part: device_pixmap(color, part) for part in ("left", "right", "case")}
+        self.images = {part: device_pixmap(color, part, self.model) for part in ("left", "right", "case", "headphone")}
         self.update()
+
+    def set_model(self, model):
+        if self.model != model:
+            self.model = model
+            self.set_color(self.color)
 
     def paintEvent(self, event):
         p = QPainter(self)
@@ -79,12 +87,18 @@ class BudsArt(QWidget):
         p.drawEllipse(QRectF(260, 13, 145, 145))
         p.setOpacity(1)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        for part, x in (("left", 20), ("right", 130)):
-            p.drawPixmap(QRectF(x, 24, 90, 148), self.images[part], QRectF(127, 44, 258, 424))
-        p.drawPixmap(QRectF(250, 16, 165, 165), self.images["case"], QRectF(64, 64, 384, 384))
-        p.setPen(QColor(palette()["muted"]))
-        for text, x, width in (("L", 20, 90), ("R", 130, 90), ("CASE", 250, 165)):
-            p.drawText(QRectF(x, 180, width, 20), Qt.AlignmentFlag.AlignCenter, text)
+        if model_info(self.model)["kind"] in ("headphones", "neckband"):
+            image = self.images["headphone"]
+            p.drawPixmap(QRectF(118, 0, 185, 185), image, QRectF(image.rect()))
+        else:
+            for part, x in (("left", 20), ("right", 130)):
+                source = QRectF(127, 44, 258, 424) if self.model in ("B172", "B187") else QRectF(self.images[part].rect())
+                p.drawPixmap(QRectF(x, 24, 90, 148), self.images[part], source)
+            source = QRectF(64, 64, 384, 384) if self.model in ("B172", "B187") else QRectF(self.images["case"].rect())
+            p.drawPixmap(QRectF(250, 16, 165, 165), self.images["case"], source)
+            p.setPen(QColor(palette()["muted"]))
+            for text, x, width in (("L", 20, 90), ("R", 130, 90), ("CASE", 250, 165)):
+                p.drawText(QRectF(x, 180, width, 20), Qt.AlignmentFlag.AlignCenter, text)
         p.end()
 
 
@@ -113,7 +127,12 @@ class BatteryTile(QFrame):
         box.addWidget(self.detail)
 
     def set_color(self, color):
-        self.thumbnail.setPixmap(device_thumbnail(color, self.part, 58))
+        self.color = color
+        self.thumbnail.setPixmap(device_thumbnail(color, self.part, 58, getattr(self, "model", "B172")))
+
+    def set_model(self, model):
+        self.model = model
+        self.set_color(self.color)
 
     def update_value(self, data):
         self.ring.set_value(data)
@@ -149,7 +168,7 @@ class Switch(QCheckBox):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, demo=False, auto_connect=False):
+    def __init__(self, demo=False, auto_connect=False, demo_model="B172"):
         super().__init__()
         self.setWindowTitle("Nothing X")
         self.resize(1140, 850)
@@ -187,7 +206,7 @@ class MainWindow(QMainWindow):
         self.worker.start()
         self.audio.start()
         if demo:
-            self.worker.submit("demo")
+            self.worker.submit("demo", demo_model)
         else:
             self.worker.submit("devices")
         self.render({})
@@ -260,13 +279,13 @@ class MainWindow(QMainWindow):
         self.refresh_button = button("↻  Refresh", self.refresh)
         header.addWidget(self.refresh_button)
         content.addLayout(header)
-        self.banner = label("Pair your earbuds in your desktop’s Bluetooth settings, then connect below.", "banner", True)
+        self.banner = label("Pair your audio device in your desktop’s Bluetooth settings, then connect below.", "banner", True)
         content.addWidget(self.banner)
         connection, row = card()
         row.setContentsMargins(15, 13, 15, 13)
         line = QHBoxLayout()
         self.device_select = QComboBox()
-        self.device_select.addItem("Select paired earbuds…", "")
+        self.device_select.addItem("Select paired device…", "")
         self.device_select.setMinimumWidth(180)
         self.device_select.setToolTip("Paired Bluetooth devices")
         self.device_select.currentIndexChanged.connect(self.select_device)
@@ -326,7 +345,8 @@ class MainWindow(QMainWindow):
         text.addWidget(self.hero_status)
         text.addStretch()
         appearance = QHBoxLayout()
-        appearance.addWidget(label("Colour", "muted"))
+        self.color_label = label("Colour", "muted")
+        appearance.addWidget(self.color_label)
         self.color_select = QComboBox()
         self.color_select.setAccessibleName("Earbud and case colour")
         self.color_select.setToolTip("Match the product artwork to your earbuds")
@@ -344,7 +364,7 @@ class MainWindow(QMainWindow):
         box.addWidget(hero)
         batteries = QHBoxLayout()
         self.batteries = {}
-        for key, title, mark in [("left", "Left earbud", "L"), ("right", "Right earbud", "R"), ("case", "Charging case", "C")]:
+        for key, title, mark in [("left", "Left earbud", "L"), ("right", "Right earbud", "R"), ("case", "Charging case", "C"), ("headphone", "Headphones", "H")]:
             tile = BatteryTile(title, mark, key, self.product_color)
             self.batteries[key] = tile
             batteries.addWidget(tile)
@@ -481,7 +501,7 @@ class MainWindow(QMainWindow):
         if QSystemTrayIcon.isSystemTrayAvailable():
             self.tray = QSystemTrayIcon(self)
             self.tray.setIcon(self.windowIcon() if not self.windowIcon().isNull() else QIcon.fromTheme("audio-headphones"))
-            self.tray.setToolTip("Nothing X · Linux")
+            self.tray.setToolTip("Nothing X")
             menu = QMenu()
             menu.addAction("Open Nothing X", self.restore)
             menu.addAction("Disconnect controls", lambda: self.worker.submit("disconnect"))
@@ -503,7 +523,7 @@ class MainWindow(QMainWindow):
         current = self.address.text()
         self.device_select.blockSignals(True)
         self.device_select.clear()
-        self.device_select.addItem("Select paired earbuds…", "")
+        self.device_select.addItem("Select paired device…", "")
         for address, name in devices:
             self.device_select.addItem(name, address)
         self.device_select.blockSignals(False)
@@ -511,7 +531,7 @@ class MainWindow(QMainWindow):
             idx = self.device_select.findData(current)
             self.device_select.setCurrentIndex(max(0, idx))
         elif devices:
-            matches = [(a, n) for a, n in devices if "cmf" in n.lower() and "pro 2" in n.lower()]
+            matches = [(a, n) for a, n in devices if Discovery.matches(n)]
             if len(matches) == 1:
                 self.device_select.setCurrentIndex(self.device_select.findData(matches[0][0]))
         if not devices:
@@ -537,7 +557,7 @@ class MainWindow(QMainWindow):
             return
         address = self.address.text().strip().upper()
         if not MAC.fullmatch(address):
-            self.show_message("Choose paired earbuds or enter their Bluetooth address (AA:BB:CC:DD:EE:FF).", True)
+            self.show_message("Choose a paired device or enter their Bluetooth address (AA:BB:CC:DD:EE:FF).", True)
             self.address.setFocus()
             return
         self.settings.setValue("address", address)
@@ -578,7 +598,32 @@ class MainWindow(QMainWindow):
     def render(self, state):
         self.state = state
         state = {**state, **self.requested}
-        known = state.get("model") in ("B172", "B187")
+        profile = model_info(state.get("model"))
+        known = state.get("model") in MODELS
+        caps = set(state.get("capabilities", profile.get("features", [])))
+        if state.get("model") and getattr(self, "display_model", None) != state["model"]:
+            self.display_model = state["model"]
+            self.product_name.setText(profile["name"])
+            self.product_brand.setText("CMF BY NOTHING" if profile["name"].startswith("CMF") else "NOTHING AUDIO")
+            self.product_art.set_model(state["model"])
+            for tile in self.batteries.values():
+                tile.set_model(state["model"])
+        single = profile["kind"] in ("headphones", "neckband")
+        self.color_label.setVisible(profile.get("artwork") == "cmf-buds-pro-2")
+        self.color_select.setVisible(profile.get("artwork") == "cmf-buds-pro-2")
+        for part, tile in self.batteries.items():
+            tile.setVisible((part == "headphone") if single else part != "headphone")
+        choices = [preset["name"] for preset in profile.get("eq_presets", [])]
+        if getattr(self, "eq_model", None) != state.get("model"):
+            self.eq_model = state.get("model")
+            self.eq_select.clear()
+            self.eq_select.addItems(["Waiting for device", *choices])
+        allowed_anc = profile.get("anc_modes", [])
+        levels = [name for name in ("Adaptive", "High", "Mid", "Low") if name in allowed_anc]
+        if [self.anc_level.itemText(i) for i in range(self.anc_level.count())] != levels:
+            self.anc_level.clear()
+            self.anc_level.addItems(levels)
+        self.bass_slider.setMaximum(round(profile.get("bass_max", 5) * 2))
         ready = self.connection in ("connected", "demo") and known
         self.refresh_button.setEnabled(self.connection in ("connected", "demo") and "_refresh" not in self.pending)
         self.hero_status.setText("Demo mode" if self.connection == "demo" else "Connected" if ready else "Disconnected")
@@ -586,14 +631,14 @@ class MainWindow(QMainWindow):
             tile.update_value(state.get("battery", {}).get(name))
         anc = state.get("anc")
         for title, b in self.anc_buttons.items():
-            b.setEnabled(ready and "anc" in state and "anc" not in self.pending)
+            b.setEnabled(ready and "anc" in caps and "anc" in state and "anc" not in self.pending and (bool(levels) if title == "Noise cancellation" else title in allowed_anc))
             b.setChecked(anc in ("High", "Mid", "Low", "Adaptive") if title == "Noise cancellation" else anc == title)
         self.anc_level.setEnabled(ready and anc in ("High", "Mid", "Low", "Adaptive") and "anc" not in self.pending)
         if anc in ("High", "Mid", "Low", "Adaptive"):
             self.anc_level.setCurrentText(anc)
         for key, control in self.controls.items():
             busy = key in self.pending
-            available = ready and key in state and not busy
+            available = ready and key in caps and key in state and not busy
             control.setEnabled(available)
             control.setToolTip("Applying and checking setting…" if busy else "Reported by earbuds" if key in state else "Unavailable until the device reports this setting")
             control.blockSignals(True)
@@ -608,20 +653,24 @@ class MainWindow(QMainWindow):
                 control.setCurrentIndex(max(0, control.findData(state.get(key, -1))))
             control.blockSignals(False)
         bass = state.get("bass")
-        self.bass_toggle.setEnabled(ready and bass is not None and "bass" not in self.pending)
+        self.bass_toggle.setEnabled(ready and "bass" in caps and bass is not None and "bass" not in self.pending)
         self.bass_toggle.setChecked(bool(bass and bass[0]))
-        self.bass_slider.setEnabled(ready and bool(bass and bass[0]) and "bass" not in self.pending)
+        self.bass_slider.setEnabled(ready and "bass" in caps and bool(bass and bass[0]) and "bass" not in self.pending)
         if bass and not self.bass_slider.isSliderDown():
             self.bass_slider.setValue(round(bass[1] * 2))
         self.bass_value.setText(f"{bass[1]:g} / 5" if bass else "—")
         for b in self.find_buttons:
-            b.setEnabled(ready and "find" not in self.pending)
-        self.stop_button.setEnabled(ready)
+            b.setEnabled(ready and "find" in caps and "find" not in self.pending)
+        self.find_buttons[0].setText("Ring headphones" if single else "Ring device" if profile.get("ring_legacy") else "Ring left")
+        self.find_buttons[1].setVisible(not single and not profile.get("ring_legacy"))
+        self.stop_button.setEnabled(ready and "find" in caps)
         self.info.setText(f'Model {state.get("model", "—")}   ·   Firmware {state.get("firmware", "—")}')
         if self.connection == "connected" and state.get("model") and not known:
-            self.show_message("This device is not a confirmed CMF Buds Pro 2. Settings are read-only to avoid sending commands for a different model.", True)
+            self.show_message("This model is not in the device catalog. Battery and reported settings are available in read-only mode.", True)
 
     def change(self, key, value):
+        if key == "anc" and value == "Adaptive" and value not in model_info(self.state.get("model")).get("anc_modes", []):
+            value = self.anc_level.currentText()
         if key in self.pending:
             self.render(self.state)
             return
@@ -655,6 +704,8 @@ class MainWindow(QMainWindow):
             self.render(self.state)
 
     def find_bud(self, side):
+        if model_info(self.state.get("model"))["kind"] in ("headphones", "neckband"):
+            side = 6
         result = QMessageBox.question(self, "Play locator sound?", "Take both earbuds out of your ears first. A locator tone will play for up to 15 seconds.")
         if result == QMessageBox.StandardButton.Yes:
             self.change("find", (side, True))
@@ -662,8 +713,10 @@ class MainWindow(QMainWindow):
 
     def stop_ringing(self):
         if self.connection in ("connected", "demo"):
-            self.worker.submit("write", "find", (2, False))
-            self.worker.submit("write", "find", (3, False))
+            profile = model_info(self.state.get("model"))
+            sides = (6,) if profile["kind"] in ("headphones", "neckband") else (2,) if profile.get("ring_legacy") else (2, 3)
+            for side in sides:
+                self.worker.submit("write", "find", (side, False))
 
     def refresh(self):
         self.audio.submit()

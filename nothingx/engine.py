@@ -21,6 +21,8 @@ class Engine:
         self.context = self.library.nx_engine_create()
         if not self.context:
             raise RuntimeError("Could not create the native backend.")
+        from .models import MODELS
+        self.call("configure", profiles=MODELS)
 
     def call(self, op, **values):
         request = json.dumps({"op": op, **values}, separators=(",", ":")).encode()

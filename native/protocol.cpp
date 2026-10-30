@@ -1,6 +1,8 @@
 #include "protocol.hpp"
 #include <algorithm>
+#include <cctype>
 #include <cmath>
+#include <cstdio>
 
 uint16_t crc16(const std::vector<uint8_t> &bytes, size_t length) {
   uint16_t crc = 0xffff;
@@ -120,16 +122,15 @@ Json parse_frame(const Frame &frame) {
                    firmware.end());
     result.set("firmware", firmware);
   } else if (cmd == 0xC01C && !p.empty()) {
-    if (p == std::vector<uint8_t>{0x72, 0xb1})
-      result.set("model", "B172");
-    else if (p == std::vector<uint8_t>{0x87, 0xb1})
-      result.set("model", "B187");
-    else {
-      std::string model(p.begin(), p.end());
-      if (model.find("B172") != std::string::npos)
-        model = "B172";
-      else if (model.find("B187") != std::string::npos)
-        model = "B187";
+    if (p.size() == 2 && (p[1] & 0xF0) >= 0xB0) {
+      char id[5];
+      std::snprintf(id, sizeof(id), "%02X%02X", p[1], p[0]);
+      result.set("model", id);
+    } else {
+      std::string model;
+      for (auto byte : p)
+        if (std::isprint(byte))
+          model.push_back(std::toupper(byte));
       result.set("model", model);
     }
   }
@@ -161,7 +162,8 @@ Command write_command(const std::string &key, const Json &value) {
       (value.number() == 0 || value.number() == 2))
     return {0xF01C, {uint8_t(value.number())}};
   if (key == "find" && value.size() == 2 && value.at(0).is(json_type_int) &&
-      (value.at(0).number() == 2 || value.at(0).number() == 3) &&
+      (value.at(0).number() == 2 || value.at(0).number() == 3 ||
+       value.at(0).number() == 6) &&
       value.at(1).is(json_type_boolean))
     return {0xF002,
             {uint8_t(value.at(0).number()), uint8_t(value.at(1).boolean())}};

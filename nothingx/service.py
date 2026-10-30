@@ -171,7 +171,7 @@ class Service(QObject):
         socket, self.transport = self.transport, None
         if socket:
             for side in self.ringing:
-                packet = self.engine.call("packet", command=0xF002, payload=[side, 0], sequence=self.next_sequence())
+                packet = self.engine.call("write", key="find", value=[side, False], sequence=self.next_sequence())
                 socket.write(bytes(packet["bytes"]))
             socket.disconnectFromService()
             socket.deleteLater()
@@ -198,7 +198,10 @@ class Service(QObject):
         if self.phase != "connected":
             self.emit("completed", key="_refresh")
             return
+        caps = set(self.state().get("capabilities", []))
         for key in READ_KEYS:
+            if key not in ("model", "firmware", "battery") and key not in caps:
+                continue
             if key not in self.refresh_keys:
                 self.refresh_keys.add(key)
                 self.request("read", key=key, callback=lambda _, k=key: self.read_complete(k))
@@ -255,10 +258,22 @@ class Service(QObject):
         self.emit("message", text="Updated" if confirmed else "The device did not confirm this setting. Showing the last reported value.", error=not confirmed)
         self.emit("completed", key=key)
 
-    def start_demo(self):
+    def start_demo(self, model="B172"):
+        from .models import model_info
         self.disconnect()
         self.demo = True
-        for key, payload in DEMO_PAYLOADS.items():
+        profile = model_info(model)
+        data = dict(DEMO_PAYLOADS)
+        number = int(model, 16)
+        data["model"] = [number & 255, number >> 8]
+        data["eq"] = [0, 0] if profile.get("eq_index") else [0]
+        if profile["kind"] in ("headphones", "neckband"):
+            data["battery"] = [1, 6, 84]
+        if "Adaptive" not in profile.get("anc_modes", []):
+            data["anc"] = [1, 1, 0, 2, 1, 0]
+        for key, payload in data.items():
+            if key not in ("model", "battery", "firmware") and key not in profile["features"]:
+                continue
             command = self.engine.call("read", key=key)["command"]
             self.feed(bytes(self.engine.call("packet", command=command, payload=payload)["bytes"]))
         self.status("demo", "Demo mode")
@@ -268,7 +283,9 @@ class Service(QObject):
         if key == "anc":
             payload = [1, ANC[value], 0, 2, ANC[value], 0]
         elif key == "eq":
-            payload = [0, EQ[value]]
+            profile = self.state().get("device", {})
+            number = next(p["value"] for p in profile["eq_presets"] if p["name"] == value)
+            payload = [0, number] if profile.get("eq_index") else [number]
         elif key == "bass":
             payload = [int(value[0]), round(value[1] * 2)]
         elif key == "in_ear":
@@ -310,7 +327,7 @@ class Service(QObject):
             elif action == "audio":
                 self.audio.request(request.get("key", "refresh"), request.get("value"), request.get("target"))
             elif action == "demo":
-                self.start_demo()
+                self.start_demo(request.get("model", "B172"))
             elif action == "devices":
                 self.discovery.refresh()
             elif action == "quit":
