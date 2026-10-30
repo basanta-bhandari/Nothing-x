@@ -1,34 +1,39 @@
-pkgname=nothingx-linux
-pkgver=0.3.0
+pkgname=('nothingx-cpp' 'nothingx-rust')
+pkgbase=nothingx
+pkgver=0.4.0
 pkgrel=1
-pkgdesc='Nothing X companion with a C++ backend and Cython Qt frontend'
-arch=('x86_64')
+pkgdesc='Nothing and CMF audio controls with a shared Qt frontend'
+arch=('x86_64' 'aarch64')
+url='https://github.com/basanta-bhandari/Nothing-x'
 license=('MIT' 'LicenseRef-Nothing-Assets')
-depends=('python' 'pyside6' 'glib2' 'json-c' 'libpulse' 'bluez-libs' 'bluez' 'wireplumber')
-makedepends=('cmake' 'ninja' 'cython' 'python-setuptools')
+depends=('python' 'pyside6' 'json-c' 'bluez' 'bluez-utils' 'libpulse' 'wireplumber')
+makedepends=('cmake' 'ninja' 'cython' 'python-setuptools' 'rust')
 options=('!strip' '!debug')
 source=()
 sha256sums=()
 
 build() {
-    cmake -S "$startdir/native" -B "$startdir/build/native" -DCMAKE_BUILD_TYPE=Release
-    cmake --build "$startdir/build/native" -j2
-    install -Dm755 "$startdir/build/native/nothingx-core" "$startdir/nothingx/bin/nothingx-core"
     cd "$startdir"
+    python tools/build_backends.py --backend all
     python setup.py build_ext --inplace
 }
 
-package() {
-    install -dm755 "$pkgdir/usr/lib/nothingx-linux/nothingx"
-    install -m644 "$startdir"/nothingx/*.py "$startdir"/nothingx/*.so "$pkgdir/usr/lib/nothingx-linux/nothingx/"
-    install -Dm755 "$startdir/nothingx/bin/nothingx-core" "$pkgdir/usr/lib/nothingx-linux/nothingx/bin/nothingx-core"
-    install -dm755 "$pkgdir/usr/lib/nothingx-linux/nothingx/assets/cmf-buds-pro-2"
-    install -m644 "$startdir"/nothingx/assets/cmf-buds-pro-2/* "$pkgdir/usr/lib/nothingx-linux/nothingx/assets/cmf-buds-pro-2/"
-    install -Dm755 "$startdir/packaging/nothingx-linux" "$pkgdir/usr/bin/nothingx-linux"
-    install -Dm644 "$startdir/packaging/nothingx-linux.desktop" "$pkgdir/usr/share/applications/nothingx-linux.desktop"
-    install -Dm644 "$startdir/nothingx/assets/cmf-buds-pro-2/blue_case.png" "$pkgdir/usr/share/icons/hicolor/512x512/apps/nothingx-linux.png"
-    install -Dm644 "$startdir/LICENSE" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
-    install -Dm644 "$startdir/NOTICE" "$pkgdir/usr/share/licenses/$pkgname/NOTICE"
-    install -dm755 "$pkgdir/usr/share/licenses/$pkgname/licenses"
-    install -m644 "$startdir"/licenses/* "$pkgdir/usr/share/licenses/$pkgname/licenses/"
+_package() {
+    local backend=$1
+    local appdir="$pkgdir/usr/lib/nothingx-$backend"
+    install -dm755 "$appdir/nothingx/bin" "$appdir/nothingx/assets"
+    install -m644 "$startdir"/nothingx/*.py "$startdir"/nothingx/*.so "$appdir/nothingx/"
+    install -m755 "$startdir/nothingx/bin/libnothingx_$backend.so" "$appdir/nothingx/bin/"
+    cp -r "$startdir/nothingx/assets/." "$appdir/nothingx/assets/"
+    printf '{"backend":"%s","distribution":"manual","managed":"pacman","version":"%s"}\n' "$backend" "$pkgver" > "$appdir/nothingx/assets/build.json"
+    install -dm755 "$pkgdir/usr/bin" "$pkgdir/usr/share/applications"
+    printf '#!/bin/sh\ncd /usr/lib/nothingx-%s\nexport NOTHINGX_BACKEND=%s\nexec /usr/bin/python -m nothingx "$@"\n' "$backend" "$backend" > "$pkgdir/usr/bin/nothingx-$backend"
+    chmod 755 "$pkgdir/usr/bin/nothingx-$backend"
+    printf '[Desktop Entry]\nType=Application\nName=Nothing X (%s)\nExec=nothingx-%s\nIcon=/usr/lib/nothingx-%s/nothingx/assets/cmf-buds-pro-2/blue_case.png\nTerminal=false\nCategories=AudioVideo;Audio;Settings;\nKeywords=Nothing;CMF;Buds;Headphones;\n' "$backend" "$backend" "$backend" > "$pkgdir/usr/share/applications/io.github.basanta_bhandari.NothingX.$backend.desktop"
+    install -Dm644 "$startdir/LICENSE" "$pkgdir/usr/share/licenses/nothingx-$backend/LICENSE"
+    install -m644 "$startdir/NOTICE" "$pkgdir/usr/share/licenses/nothingx-$backend/NOTICE"
+    cp -r "$startdir/licenses" "$pkgdir/usr/share/licenses/nothingx-$backend/"
 }
+
+package_nothingx-cpp() { _package cpp; }
+package_nothingx-rust() { _package rust; }

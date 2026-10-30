@@ -17,6 +17,9 @@ from .preferences import read_preferences, save_preferences
 from .models import MODELS, model_info
 from .discovery import Discovery
 from . import startup
+from . import __version__
+from .variants import variant_id
+from .updater import Updater
 
 STYLE = stylesheet()
 
@@ -196,6 +199,8 @@ class MainWindow(QMainWindow):
         self.worker.completed.connect(self.on_completed)
         self.audio = AudioWorker(self.backend_client, str(self.settings.value("address", "")), self)
         self.audio.message.connect(self.show_message)
+        self.updater = Updater(self)
+        self.updater.ready_to_restart.connect(self.quit)
         self._build()
         for number in range(4):
             shortcut = QShortcut(QKeySequence(f"Ctrl+{number + 1}"), self)
@@ -501,7 +506,25 @@ class MainWindow(QMainWindow):
         self.startup_toggle.clicked.connect(self.change_startup)
         startup_layout.addWidget(self.startup_toggle)
         box.addWidget(startup_card)
+        update_card, update_layout = card("Updates", f"Version {__version__} · {variant_id()}")
+        self.update_status = label("", "muted", True)
+        update_layout.addWidget(self.update_status)
+        update_actions = QHBoxLayout()
+        self.check_update = button("Check for updates", self.updater.check)
+        self.install_update = button("Install update and restart", self.confirm_update, True)
+        self.install_update.setVisible(False)
+        self.updater.status.connect(self.update_status.setText)
+        self.updater.available.connect(self.install_update.setVisible)
+        update_actions.addWidget(self.check_update)
+        update_actions.addWidget(self.install_update)
+        update_actions.addStretch()
+        update_layout.addLayout(update_actions)
+        box.addWidget(update_card)
         box.addStretch()
+
+    def confirm_update(self):
+        if QMessageBox.question(self, "Install update?", "Download the matching version from GitHub, verify it, then restart Nothing X?") == QMessageBox.StandardButton.Yes:
+            self.updater.install()
 
     def change_startup(self, enabled):
         try:
@@ -760,6 +783,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.refresh_timer.stop()
+        self.updater.close()
         self.audio.stop()
         app = QApplication.instance()
         app.setQuitOnLastWindowClosed(False)

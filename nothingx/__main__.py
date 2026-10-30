@@ -5,6 +5,9 @@ from pathlib import Path
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1] == "--apply-update":
+        from .update_install import main as apply_update
+        return apply_update(sys.argv[2:])
     parser = argparse.ArgumentParser(description="Nothing and CMF audio controls for Linux and macOS")
     parser.add_argument("--demo", action="store_true", help="Use a simulated device; no Bluetooth access")
     parser.add_argument("--connect", action="store_true", help="Connect to the saved earbuds on startup")
