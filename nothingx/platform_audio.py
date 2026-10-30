@@ -246,4 +246,7 @@ class UnavailableAudio(QObject):
 
 
 def make_audio(parent=None):
+    if sys.platform == "darwin":
+        from .macos_audio import MacAudio
+        return MacAudio(parent)
     return LinuxAudio(parent) if sys.platform.startswith("linux") else UnavailableAudio(parent)
