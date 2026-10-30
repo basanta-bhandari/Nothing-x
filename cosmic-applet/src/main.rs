@@ -6,7 +6,11 @@ use cosmic::{
 };
 use futures::SinkExt;
 use serde_json::{Value, json};
-use std::{path::PathBuf, process::Stdio};
+use std::{
+    collections::{BTreeMap, HashSet},
+    path::PathBuf,
+    process::Stdio,
+};
 use tokio::{
     io::{AsyncBufReadExt, AsyncWriteExt, BufReader},
     sync::mpsc,
@@ -23,7 +27,12 @@ enum Message {
     BridgeError(String),
     Action(&'static str),
     Set(&'static str, Value),
+    Audio(&'static str, Value, Option<String>),
+    Tab(bool),
+    Surface(cosmic::surface::Action<Message>),
     OpenFull,
+    FullClosed,
+    FullFailed(String),
 }
 
 struct Applet {
@@ -31,9 +40,13 @@ struct Applet {
     popup: Option<Id>,
     sender: Option<mpsc::UnboundedSender<String>>,
     state: Value,
+    audio: Value,
     phase: String,
     detail: String,
-    pending: bool,
+    pending: HashSet<String>,
+    requested: BTreeMap<String, Value>,
+    audio_tab: bool,
+    opening_full: bool,
 }
 
 fn project_dir() -> PathBuf {
@@ -48,17 +61,16 @@ fn project_dir() -> PathBuf {
             data.join("nothingx-cosmic/app")
         })
 }
-
 fn bridge_subscription() -> Subscription<Message> {
     Subscription::run(|| {
         cosmic::iced::stream::channel(
             64,
             |mut output: futures::channel::mpsc::Sender<Message>| async move {
                 let directory = project_dir();
-                let python = directory.join(".venv/bin/python");
-                let mut child = match tokio::process::Command::new(&python)
+                let backend = directory.join("nothingx/bin/nothingx-core");
+                let mut child = match tokio::process::Command::new(&backend)
                     .current_dir(&directory)
-                    .args(["-m", "nothingx.cosmic_bridge"])
+                    .arg("--auto")
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::null())
@@ -116,22 +128,24 @@ impl Applet {
             .as_ref()
             .is_none_or(|sender| sender.send(value.to_string()).is_err())
         {
-            self.detail = "Bluetooth backend unavailable".into();
+            self.detail = "Backend unavailable".into();
             self.phase = "disconnected".into();
-            self.pending = false;
+            self.pending.clear();
+            self.requested.clear();
         }
     }
-
+    fn setting(&self, key: &str) -> Option<&Value> {
+        self.requested.get(key).or_else(|| self.state.get(key))
+    }
     fn ready(&self, key: &str) -> bool {
-        self.phase == "connected"
-            && !self.pending
+        matches!(self.phase.as_str(), "connected" | "demo")
+            && !self.pending.contains(key)
             && matches!(
                 self.state.get("model").and_then(Value::as_str),
                 Some("B172" | "B187")
             )
             && self.state.get(key).is_some()
     }
-
     fn battery(&self, part: &str) -> String {
         self.state
             .get("battery")
@@ -140,47 +154,61 @@ impl Applet {
             .and_then(Value::as_u64)
             .map_or_else(|| "—".into(), |level| format!("{level}%"))
     }
-
-    fn battery_cell(&self, part: &str, label: &str) -> Element<'_, Message> {
+    fn battery_cell(&self, part: &str, title: &str) -> Element<'_, Message> {
         let image = project_dir()
             .join("nothingx/assets/cmf-buds-pro-2")
             .join(format!("blue_{part}.png"));
+        let detail = if self
+            .state
+            .pointer(&format!("/battery/{part}/available"))
+            .and_then(Value::as_bool)
+            == Some(false)
+        {
+            "Last reported"
+        } else if self
+            .state
+            .pointer(&format!("/battery/{part}/charging"))
+            .and_then(Value::as_bool)
+            == Some(true)
+        {
+            "Charging"
+        } else {
+            title
+        };
         row![
-            icon::icon(icon::from_path(image)).size(48),
+            icon::icon(icon::from_path(image)).size(44),
             column![
-                text::caption(label.to_string()),
+                text::caption(detail.to_string()),
                 text::title3(self.battery(part))
             ]
             .spacing(2)
         ]
-        .spacing(3)
+        .spacing(2)
         .align_y(Alignment::Center)
         .into()
     }
-
     fn option_button(&self, key: &'static str, value: &'static str) -> Element<'_, Message> {
-        let selected = self.state.get(key).and_then(Value::as_str) == Some(value);
-        let label = if selected {
+        let selected = self.setting(key).and_then(Value::as_str) == Some(value);
+        let mut control = button::standard(if selected {
             format!("✓ {value}")
         } else {
             value.to_string()
-        };
-        let mut button = button::standard(label);
+        });
         if self.ready(key) {
-            button = button.on_press(Message::Set(key, json!(value)));
+            control = control.on_press(Message::Set(key, json!(value)));
         }
-        button.into()
+        control.into()
     }
-
     fn toggle_row(&self, key: &'static str, title: &'static str) -> Element<'_, Message> {
-        let value = self.state.get(key).and_then(Value::as_bool);
-        let control: Element<'_, Message> = if let Some(enabled) = value.filter(|_| self.ready(key))
-        {
-            widget::toggler(enabled)
-                .on_toggle(move |next| Message::Set(key, json!(next)))
-                .into()
+        let value = self.setting(key).and_then(Value::as_bool);
+        let control: Element<'_, Message> = if let Some(enabled) = value {
+            let mut toggle = widget::toggler(enabled);
+            if self.ready(key) {
+                toggle = toggle.on_toggle(move |value| Message::Set(key, json!(value)));
+            }
+            toggle.into()
         } else {
-            text::caption(if value.is_some() { "Busy" } else { "—" }).into()
+            text::caption("—").into()
         };
         row![
             text::body(title),
@@ -190,122 +218,152 @@ impl Applet {
         .align_y(Alignment::Center)
         .into()
     }
-
     fn panel_content(&self) -> Element<'_, Message> {
-        let icon = icon::icon(icon::from_path(
-            project_dir().join("nothingx/assets/cmf-buds-pro-2/blue_case.png"),
+        let image = icon::icon(icon::from_path(
+            project_dir().join("nothingx/assets/cmf-buds-pro-2/blue_left.png"),
         ))
-        .size(22);
-        let left = self
+        .size(24);
+        let l = self
             .state
             .pointer("/battery/left/level")
             .and_then(Value::as_u64);
-        let right = self
+        let r = self
             .state
             .pointer("/battery/right/level")
             .and_then(Value::as_u64);
-        let level = match (left, right) {
+        let level = match (l, r) {
             (Some(l), Some(r)) => format!("{}%", l.min(r)),
             (Some(l), None) | (None, Some(l)) => format!("{l}%"),
-            _ => "—".to_string(),
+            _ => "—".into(),
         };
-        let value = self.core.applet.text(level);
+        let value = self.core.applet.text(level).width(Length::Fixed(42.0));
         if matches!(
             self.core.applet.anchor,
             PanelAnchor::Top | PanelAnchor::Bottom
         ) {
-            row![icon, value]
-                .spacing(5)
+            row![image, value]
+                .spacing(3)
                 .align_y(Alignment::Center)
                 .into()
         } else {
-            column![icon, value]
-                .spacing(2)
+            column![image, value]
+                .spacing(1)
                 .align_x(Alignment::Center)
                 .into()
         }
     }
-}
-
-impl cosmic::Application for Applet {
-    type Executor = cosmic::executor::Default;
-    type Flags = ();
-    type Message = Message;
-    const APP_ID: &'static str = APP_ID;
-
-    fn core(&self) -> &cosmic::Core {
-        &self.core
-    }
-    fn core_mut(&mut self) -> &mut cosmic::Core {
-        &mut self.core
-    }
-
-    fn init(core: cosmic::Core, _: ()) -> (Self, Task<cosmic::Action<Message>>) {
-        (
-            Self {
-                core,
-                popup: None,
-                sender: None,
-                state: json!({}),
-                phase: "disconnected".into(),
-                detail: "Connecting…".into(),
-                pending: false,
-            },
-            Task::none(),
-        )
-    }
-
-    fn style(&self) -> Option<cosmic::iced::theme::Style> {
-        Some(cosmic::applet::style())
-    }
-    fn on_close_requested(&self, id: Id) -> Option<Message> {
-        Some(Message::PopupClosed(id))
-    }
-    fn subscription(&self) -> Subscription<Message> {
-        bridge_subscription()
-    }
-
-    fn view(&self) -> Element<'_, Message> {
-        button::custom(self.panel_content())
-            .padding(4)
-            .on_press_down(Message::TogglePopup)
-            .class(cosmic::theme::Button::AppletIcon)
-            .into()
-    }
-
-    fn view_window(&self, _: Id) -> Element<'_, Message> {
-        let header = row![
-            icon::icon(icon::from_path(
-                project_dir().join("nothingx/assets/cmf-buds-pro-2/blue_case.png")
-            ))
-            .size(32),
-            text::title3("CMF Buds Pro 2"),
-            space::horizontal().width(Length::Fill),
-            button::icon(icon::from_name("view-refresh-symbolic"))
-                .on_press(Message::Action("refresh"))
-        ]
-        .spacing(8)
-        .align_y(Alignment::Center);
-        let batteries = row![
-            self.battery_cell("left", "Left"),
-            space::horizontal().width(Length::Fill),
-            self.battery_cell("right", "Right"),
-            space::horizontal().width(Length::Fill),
-            self.battery_cell("case", "Case"),
-        ]
-        .align_y(Alignment::Center);
-        let connection = if self.phase == "connected" {
-            button::text("Disconnect").on_press(Message::Action("disconnect"))
-        } else if self.phase == "connecting" {
-            button::text("Cancel").on_press(Message::Action("disconnect"))
+    fn audio_controls(&self) -> Element<'_, Message> {
+        if self.audio.get("available").and_then(Value::as_bool) != Some(true) {
+            return text::body(
+                self.audio
+                    .get("error")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Connecting to PipeWire…")
+                    .to_string(),
+            )
+            .into();
+        }
+        let mut content = column![text::heading("Bluetooth profile")].spacing(10);
+        if let Some(card) = self.audio.get("card").filter(|v| !v.is_null()) {
+            let profiles = card
+                .get("profiles")
+                .and_then(Value::as_array)
+                .cloned()
+                .unwrap_or_default();
+            let titles: Vec<String> = profiles
+                .iter()
+                .map(|p| p["description"].as_str().unwrap_or("").to_string())
+                .collect();
+            let names: Vec<String> = profiles
+                .iter()
+                .map(|p| p["name"].as_str().unwrap_or("").to_string())
+                .collect();
+            let selected = names
+                .iter()
+                .position(|name| Some(name.as_str()) == card["profile"].as_str());
+            if !titles.is_empty() {
+                content = content.push(widget::dropdown::popup_dropdown(
+                    titles,
+                    selected,
+                    move |index| Message::Audio("profile", json!(names[index]), None),
+                    self.popup.unwrap_or(Id::NONE),
+                    Message::Surface,
+                    |m| m,
+                ));
+            }
         } else {
-            button::text("Connect").on_press(Message::Action("connect"))
-        };
+            content = content.push(text::caption("Connect the buds in Bluetooth settings."));
+        }
+        if let Some(sink) = self.audio.get("sink").filter(|v| !v.is_null()) {
+            let codec = sink["codec"].as_str().unwrap_or("").to_uppercase();
+            content = content.push(text::caption(format!(
+                "{} · {}",
+                codec,
+                sink["sample"].as_str().unwrap_or("")
+            )));
+            let volume = sink["volume"].as_i64().unwrap_or(0).clamp(0, 100) as i32;
+            content = content
+                .push(text::heading(format!("Volume · {volume}%")))
+                .push(widget::slider(0..=100, volume, |v| {
+                    Message::Audio("output_volume", json!(v), None)
+                }));
+            content = content.push(
+                row![
+                    text::body("Mute"),
+                    space::horizontal().width(Length::Fill),
+                    widget::toggler(sink["mute"].as_bool().unwrap_or(false))
+                        .on_toggle(|v| Message::Audio("output_mute", json!(v), None))
+                ]
+                .align_y(Alignment::Center),
+            );
+            let mut default = button::text("Use as default output");
+            if sink["name"] != self.audio["default_sink"] {
+                default = default.on_press(Message::Audio("default_output", Value::Null, None));
+            }
+            content = content.push(default);
+        }
+        if let Some(enabled) = self.audio["auto_headset"].as_bool() {
+            content = content
+                .push(text::caption(
+                    "Allow headset mode for microphone use (all Bluetooth headsets)",
+                ))
+                .push(
+                    widget::toggler(enabled)
+                        .on_toggle(|v| Message::Audio("auto_headset", json!(v), None)),
+                );
+        }
+        if let Some(sources) = self.audio["sources"].as_array() {
+            let titles: Vec<String> = sources
+                .iter()
+                .map(|s| s["description"].as_str().unwrap_or("").to_string())
+                .collect();
+            let names: Vec<String> = sources
+                .iter()
+                .map(|s| s["name"].as_str().unwrap_or("").to_string())
+                .collect();
+            let selected = names
+                .iter()
+                .position(|n| Some(n.as_str()) == self.audio["default_source"].as_str());
+            if !titles.is_empty() {
+                content = content.push(text::heading("Microphone")).push(
+                    widget::dropdown::popup_dropdown(
+                        titles,
+                        selected,
+                        move |i| {
+                            Message::Audio("default_input", Value::Null, Some(names[i].clone()))
+                        },
+                        self.popup.unwrap_or(Id::NONE),
+                        Message::Surface,
+                        |m| m,
+                    ),
+                );
+            }
+        }
+        content=content.push(text::caption("Headset profiles provide microphone access with reduced playback quality. Application volume, balance and routing are in full settings."));
+        content.into()
+    }
+    fn buds_controls(&self) -> Element<'_, Message> {
         let mut content = column![
-            header,
-            text::caption(self.detail.clone()),
-            batteries,
-            connection,
             text::heading("Noise control"),
             row![
                 self.option_button("anc", "Off"),
@@ -331,16 +389,15 @@ impl cosmic::Application for Applet {
                 self.option_button("eq", "Enhance vocals"),
                 self.option_button("eq", "Classical")
             ]
-            .spacing(4),
+            .spacing(4)
         ]
-        .spacing(9)
-        .width(Length::Fill);
-        if let Some(bass) = self.state.get("bass").and_then(Value::as_array) {
+        .spacing(9);
+        if let Some(bass) = self.setting("bass").and_then(Value::as_array) {
             let enabled = bass.first().and_then(Value::as_bool).unwrap_or(false);
             let level = bass.get(1).and_then(Value::as_f64).unwrap_or(0.0);
             let mut minus = button::standard("−");
             let mut plus = button::standard("+");
-            let mut toggle = button::text(if enabled { "Disable" } else { "Enable" });
+            let mut toggle = widget::toggler(enabled);
             if self.ready("bass") {
                 minus = minus.on_press(Message::Set(
                     "bass",
@@ -350,11 +407,11 @@ impl cosmic::Application for Applet {
                     "bass",
                     json!([enabled, (level + 0.5).min(5.0)]),
                 ));
-                toggle = toggle.on_press(Message::Set("bass", json!([!enabled, level])));
+                toggle = toggle.on_toggle(move |v| Message::Set("bass", json!([v, level])));
             }
             content = content.push(
                 row![
-                    text::body(format!("Ultra Bass: {level}")),
+                    text::body(format!("Ultra Bass · {level}")),
                     space::horizontal().width(Length::Fill),
                     minus,
                     plus,
@@ -364,31 +421,150 @@ impl cosmic::Application for Applet {
                 .align_y(Alignment::Center),
             );
         }
-        content = content
+        content
             .push(self.toggle_row("spatial", "Spatial audio"))
             .push(self.toggle_row("low_latency", "Low latency"))
             .push(self.toggle_row("in_ear", "In-ear detection"))
             .push(self.toggle_row("dual", "Dual connection"))
+            .into()
+    }
+}
+
+impl cosmic::Application for Applet {
+    type Executor = cosmic::executor::Default;
+    type Flags = ();
+    type Message = Message;
+    const APP_ID: &'static str = APP_ID;
+    fn core(&self) -> &cosmic::Core {
+        &self.core
+    }
+    fn core_mut(&mut self) -> &mut cosmic::Core {
+        &mut self.core
+    }
+    fn init(core: cosmic::Core, _: ()) -> (Self, Task<cosmic::Action<Message>>) {
+        (
+            Self {
+                core,
+                popup: None,
+                sender: None,
+                state: json!({}),
+                audio: json!({}),
+                phase: "disconnected".into(),
+                detail: "Connecting…".into(),
+                pending: HashSet::new(),
+                requested: BTreeMap::new(),
+                audio_tab: false,
+                opening_full: false,
+            },
+            Task::none(),
+        )
+    }
+    fn style(&self) -> Option<cosmic::iced::theme::Style> {
+        Some(cosmic::applet::style())
+    }
+    fn on_close_requested(&self, id: Id) -> Option<Message> {
+        Some(Message::PopupClosed(id))
+    }
+    fn subscription(&self) -> Subscription<Message> {
+        bridge_subscription()
+    }
+    fn view(&self) -> Element<'_, Message> {
+        let control = button::custom(self.panel_content())
+            .padding([0, 5])
+            .on_press_down(Message::TogglePopup)
+            .class(cosmic::theme::Button::AppletIcon);
+        let tooltip = format!(
+            "Earbud battery · Left {} · Right {}\nCase {}",
+            self.battery("left"),
+            self.battery("right"),
+            self.battery("case")
+        );
+        self.core
+            .applet
+            .autosize_window(self.core.applet.applet_tooltip(
+                control,
+                tooltip,
+                self.popup.is_some(),
+                Message::Surface,
+                None,
+            ))
+            .into()
+    }
+    fn view_window(&self, _: Id) -> Element<'_, Message> {
+        let header = row![
+            icon::icon(icon::from_path(
+                project_dir().join("nothingx/assets/cmf-buds-pro-2/blue_case.png")
+            ))
+            .size(32),
+            text::title3("CMF Buds Pro 2"),
+            space::horizontal().width(Length::Fill),
+            button::icon(icon::from_name("view-refresh-symbolic"))
+                .on_press(Message::Action("refresh"))
+        ]
+        .spacing(8)
+        .align_y(Alignment::Center);
+        let batteries = row![
+            self.battery_cell("left", "Left"),
+            space::horizontal().width(Length::Fill),
+            self.battery_cell("right", "Right"),
+            space::horizontal().width(Length::Fill),
+            self.battery_cell("case", "Case")
+        ]
+        .align_y(Alignment::Center);
+        let connection = if self.phase == "connected" {
+            button::text("Disconnect").on_press(Message::Action("disconnect"))
+        } else if self.phase == "connecting" {
+            button::text("Cancel").on_press(Message::Action("disconnect"))
+        } else {
+            button::text("Connect").on_press(Message::Action("connect"))
+        };
+        let tabs = row![
+            button::standard(if self.audio_tab { "Buds" } else { "✓ Buds" })
+                .on_press(Message::Tab(false)),
+            button::standard(if self.audio_tab { "✓ Audio" } else { "Audio" })
+                .on_press(Message::Tab(true))
+        ]
+        .spacing(6);
+        let mut content = column![header, batteries].spacing(10).width(Length::Fill);
+        if self.state.pointer("/battery/case/level").is_none() {
+            content = content.push(text::caption(
+                "Case battery: keep a bud inside with the lid open, then refresh.",
+            ));
+        }
+        if !self.detail.is_empty() && self.detail != "Updated" && self.detail != "Connected" {
+            content = content.push(text::caption(self.detail.clone()));
+        }
+        content = content
+            .push(connection)
+            .push(tabs)
+            .push(if self.audio_tab {
+                self.audio_controls()
+            } else {
+                self.buds_controls()
+            })
             .push(button::text("Open full settings").on_press(Message::OpenFull));
         self.core
             .applet
             .popup_container(
                 container(scrollable(content).height(Length::Shrink))
                     .padding(16)
-                    .width(Length::Fixed(400.0))
-                    .max_height(700.0),
+                    .width(Length::Fixed(420.0))
+                    .max_height(730.0),
             )
             .into()
     }
-
     fn update(&mut self, message: Message) -> Task<cosmic::Action<Message>> {
         match message {
+            Message::Surface(action) => {
+                return cosmic::task::message(cosmic::Action::Surface(action));
+            }
             Message::TogglePopup => {
                 if let Some(id) = self.popup.take() {
                     return cosmic::iced::platform_specific::shell::wayland::commands::popup::destroy_popup(id);
                 }
                 let id = Id::unique();
                 self.popup = Some(id);
+                self.send(json!({"action":"audio","key":"refresh"}));
                 let mut settings = self.core.applet.get_popup_settings(
                     self.core.main_window_id().unwrap(),
                     id,
@@ -397,9 +573,9 @@ impl cosmic::Application for Applet {
                     None,
                 );
                 settings.positioner.size_limits = Limits::NONE
-                    .min_width(350.0)
-                    .max_width(440.0)
-                    .min_height(250.0)
+                    .min_width(390.0)
+                    .max_width(460.0)
+                    .min_height(200.0)
                     .max_height(800.0);
                 return cosmic::iced::platform_specific::shell::wayland::commands::popup::get_popup(
                     settings,
@@ -415,56 +591,82 @@ impl cosmic::Application for Applet {
                 self.sender = None;
                 self.phase = "disconnected".into();
                 self.detail = error;
-                self.pending = false;
+                self.pending.clear();
+                self.requested.clear();
             }
-            Message::BridgeEvent(event) => match event.get("type").and_then(Value::as_str) {
+            Message::BridgeEvent(event) => match event["type"].as_str() {
                 Some("state") => {
                     self.state = event.get("state").cloned().unwrap_or_else(|| json!({}))
                 }
+                Some("audio") => {
+                    self.audio = event.get("state").cloned().unwrap_or_else(|| json!({}))
+                }
                 Some("status") => {
-                    self.phase = event
-                        .get("phase")
-                        .and_then(Value::as_str)
-                        .unwrap_or("disconnected")
-                        .into();
-                    self.detail = event
-                        .get("detail")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .into();
+                    self.phase = event["phase"].as_str().unwrap_or("disconnected").into();
+                    self.detail = event["detail"].as_str().unwrap_or("").into();
                     if self.phase == "disconnected" {
-                        self.pending = false;
+                        self.pending.clear();
+                        self.requested.clear();
+                        if self.opening_full {
+                            self.opening_full = false;
+                            let audio_tab = self.audio_tab;
+                            return Task::perform(
+                                async move {
+                                    let mut command =
+                                        tokio::process::Command::new(project_dir().join("run.sh"));
+                                    command.arg("--connect").arg("--page").arg(if audio_tab {
+                                        "audio"
+                                    } else {
+                                        "overview"
+                                    });
+                                    match command.status().await {
+                                        Ok(_) => Message::FullClosed,
+                                        Err(error) => Message::FullFailed(format!(
+                                            "Could not open settings: {error}"
+                                        )),
+                                    }
+                                },
+                                cosmic::Action::App,
+                            );
+                        }
                     }
                 }
                 Some("message") => {
-                    self.detail = event
-                        .get("text")
-                        .and_then(Value::as_str)
-                        .unwrap_or("")
-                        .into()
+                    self.detail = event["text"].as_str().unwrap_or("").into();
                 }
-                Some("completed") => self.pending = false,
+                Some("completed") => {
+                    if let Some(key) = event["key"].as_str() {
+                        self.pending.remove(key);
+                        self.requested.remove(key);
+                    }
+                }
                 _ => {}
             },
             Message::Action(action) => self.send(json!({"action":action})),
             Message::Set(key, value) => {
                 if self.ready(key) {
-                    self.pending = true;
-                    self.send(json!({"action":"write", "key":key, "value":value}));
+                    self.pending.insert(key.into());
+                    self.requested.insert(key.into(), value.clone());
+                    self.send(json!({"action":"write","key":key,"value":value}));
                 }
             }
+            Message::Audio(key, value, target) => {
+                self.send(json!({"action":"audio","key":key,"value":value,"target":target}));
+            }
+            Message::Tab(value) => self.audio_tab = value,
             Message::OpenFull => {
+                self.opening_full = true;
                 self.send(json!({"action":"disconnect"}));
-                if let Err(error) = std::process::Command::new(project_dir().join("run.sh")).spawn()
-                {
-                    self.detail = format!("Could not open full settings: {error}");
-                }
+            }
+            Message::FullClosed => self.send(json!({"action":"connect"})),
+            Message::FullFailed(error) => {
+                self.detail = error;
+                self.send(json!({"action":"connect"}));
             }
         }
         Task::none()
     }
 }
-
 fn main() -> cosmic::iced::Result {
     cosmic::applet::run::<Applet>(())
 }

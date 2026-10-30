@@ -9,3 +9,4 @@ dist/
 pkg/
 *.pkg.tar.*
 target/
+*.so

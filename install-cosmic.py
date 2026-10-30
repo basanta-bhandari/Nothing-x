@@ -25,15 +25,21 @@ binary_dir.mkdir(parents=True, exist_ok=True)
 app_dir = target / "app"
 app_dir.mkdir(parents=True, exist_ok=True)
 shutil.copytree(source / "nothingx", app_dir / "nothingx", dirs_exist_ok=True,
-                ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-for name in ("run.sh", "setup.sh", "requirements.txt", "LICENSE", "NOTICE"):
+                ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "bin"))
+native_dir = app_dir / "nothingx/bin"
+native_dir.mkdir(parents=True, exist_ok=True)
+shutil.copy2(source / "nothingx/bin/nothingx-core", native_dir / ".nothingx-core.new")
+os.replace(native_dir / ".nothingx-core.new", native_dir / "nothingx-core")
+for name in ("run.sh", "setup.sh", "requirements.txt", "LICENSE", "NOTICE", "setup.py", "pyproject.toml", "MANIFEST.in"):
     shutil.copy2(source / name, app_dir / name)
 shutil.copytree(source / "licenses", app_dir / "licenses", dirs_exist_ok=True)
+shutil.copytree(source / "native", app_dir / "native", dirs_exist_ok=True)
 if not (app_dir / ".venv/bin/python").exists():
     subprocess.run(["cp", "-a", "--reflink=auto", str(source / ".venv"), str(app_dir / ".venv")], check=True)
 subprocess.run([str(app_dir / ".venv/bin/python"), "-c", "from PySide6.QtCore import QCoreApplication"], check=True)
-shutil.copy2(executable, target / "cosmic-applet-nothingx")
-(target / "cosmic-applet-nothingx").chmod(0o755)
+shutil.copy2(executable, target / ".cosmic-applet-nothingx.new")
+(target / ".cosmic-applet-nothingx.new").chmod(0o755)
+os.replace(target / ".cosmic-applet-nothingx.new", target / "cosmic-applet-nothingx")
 launcher = binary_dir / "cosmic-applet-nothingx"
 launcher.write_text("#!/bin/sh\nexport NOTHINGX_APP_DIR=" + shlex.quote(str(app_dir))
                     + "\nexec " + shlex.quote(str(target / "cosmic-applet-nothingx")) + ' "$@"\n')

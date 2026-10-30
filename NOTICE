@@ -7,6 +7,15 @@ is available at https://github.com/pop-os/libcosmic. The AppImage contains
 Qt and PySide6 components distributed under their applicable LGPL licenses.
 Copies of these licenses are in the licenses directory.
 
+The C++ backend links against GLib/GIO, libpulse and BlueZ libbluetooth
+under LGPL 2.1-or-later, and json-c under MIT. Frontend modules are compiled with Cython; its generated-output license
+exception is included in licenses/Cython-COPYING.txt. Library sources:
+https://gitlab.gnome.org/GNOME/glib
+https://gitlab.freedesktop.org/pulseaudio/pulseaudio
+https://github.com/bluez/bluez
+https://github.com/json-c/json-c
+https://github.com/cython/cython
+
 The 12 PNG files in nothingx/assets/cmf-buds-pro-2/ are original Nothing/CMF
 product renders extracted unchanged from the user's own installed Nothing X
 3.10.1 (com.nothing.smartcenter, versionCode 3100105) for this personal client.

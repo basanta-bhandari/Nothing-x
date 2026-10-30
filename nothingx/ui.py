@@ -6,6 +6,8 @@ from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabe
     QMenu, QSizePolicy)
 
 from .backend import Worker, MAC
+from .audio import AudioWorker
+from .core import NativeClient
 from .protocol import ANC, EQ
 from .artwork import COLORS, DEFAULT_COLOR, device_pixmap, device_thumbnail
 
@@ -39,6 +41,7 @@ QCheckBox::indicator { width: 38px; height: 22px; border-radius: 11px; backgroun
 QCheckBox::indicator:checked { background: #ff6432; border-color: #ff6432; }
 QCheckBox::indicator:disabled { background: #292b2d; border-color: #36383a; }
 QSlider::groove:horizontal { background: #45484a; height: 5px; border-radius: 2px; }
+QSlider { background: transparent; }
 QSlider::sub-page:horizontal { background: #ff6432; border-radius: 2px; }
 QSlider::handle:horizontal { background: #f3f1ea; border: 3px solid #ff6432; width: 15px; height: 15px; margin: -8px 0; border-radius: 10px; }
 QScrollArea { border: 0; background: transparent; }
@@ -147,7 +150,8 @@ class BatteryTile(QFrame):
 
     def update_value(self, data):
         self.value.setText(f'{data["level"]}%' if data else "—")
-        self.detail.setText(("Charging" if data["charging"] else "Battery level") if data else "Not reported")
+        self.detail.setText(("Last reported" if not data.get("available", True) else "Charging" if data["charging"] else "Battery level") if data else "Open case to update" if self.part == "case" else "Not reported")
+        self.setToolTip("Keep a bud in the case with the lid open, then refresh. The closed case may not report its battery." if self.part == "case" else "")
 
 
 class Switch(QCheckBox):
@@ -178,7 +182,7 @@ class Switch(QCheckBox):
 
 
 class MainWindow(QMainWindow):
-    def __init__(self, demo=False):
+    def __init__(self, demo=False, auto_connect=False):
         super().__init__()
         self.setWindowTitle("Nothing X · Linux")
         self.resize(1140, 850)
@@ -189,18 +193,25 @@ class MainWindow(QMainWindow):
             self.product_color = DEFAULT_COLOR
         self.state = {}
         self.pending = set()
+        self.requested = {}
         self.connection = "disconnected"
         self.controls = {}
         self._closing = False
-        self.worker = Worker(self)
+        self.auto_connect_requested = auto_connect
+        self.backend_client = NativeClient(self)
+        self.worker = Worker(self.backend_client, self)
         self.worker.state_changed.connect(self.render)
         self.worker.status.connect(self.on_status)
         self.worker.message.connect(self.show_message)
         self.worker.devices.connect(self.on_devices)
         self.worker.completed.connect(self.on_completed)
+        self.audio = AudioWorker(self.backend_client, str(self.settings.value("address", "")), self)
+        self.audio.message.connect(self.show_message)
         self._build()
+        self.demo_button.setVisible(demo)
         self._tray()
         self.worker.start()
+        self.audio.start()
         if demo:
             self.worker.submit("demo")
         else:
@@ -228,7 +239,7 @@ class MainWindow(QMainWindow):
         side.addSpacing(38)
         self.pages = QStackedWidget()
         self.nav = []
-        for index, text in enumerate(["◉   Overview", "≋   Sound", "⌘   Device"]):
+        for index, text in enumerate(["◉   Overview", "≋   Sound", "♫   Audio", "⌘   Device"]):
             b = button(text, lambda checked=False, i=index: self.navigate(i))
             b.setObjectName("nav")
             b.setCheckable(True)
@@ -283,6 +294,10 @@ class MainWindow(QMainWindow):
         base.addWidget(main, 1)
         self.overview()
         self.sound_page()
+        from .audio_ui import AudioPage
+        self.audio_page = AudioPage(self.audio)
+        audio_layout = self.page()
+        audio_layout.addWidget(self.audio_page)
         self.device_page()
         footer = QHBoxLayout()
         self.status_text = label("Disconnected", "muted")
@@ -482,7 +497,9 @@ class MainWindow(QMainWindow):
 
     def navigate(self, index):
         self.pages.setCurrentIndex(index)
-        self.page_title.setText(["Overview", "Sound", "Device"][index])
+        self.page_title.setText(["Overview", "Sound", "Audio", "Device"][index])
+        if index == 2:
+            self.audio.submit()
         for i, b in enumerate(self.nav):
             b.setChecked(i == index)
 
@@ -503,11 +520,16 @@ class MainWindow(QMainWindow):
                 self.device_select.setCurrentIndex(self.device_select.findData(matches[0][0]))
         if not devices:
             self.show_message("No paired devices found. Pair the buds in Bluetooth settings, then reload the list. You can also enter their address directly.", False)
+        if self.auto_connect_requested and self.connection == "disconnected" and MAC.fullmatch(self.address.text()):
+            self.auto_connect_requested = False
+            self.connect_device()
 
     def select_device(self):
         address = self.device_select.currentData()
         if address:
             self.address.setText(address)
+            self.audio.address = address.upper()
+            self.audio.submit()
 
     def connect_device(self):
         if self.connection == "connecting":
@@ -523,6 +545,8 @@ class MainWindow(QMainWindow):
             self.address.setFocus()
             return
         self.settings.setValue("address", address)
+        self.audio.address = address
+        self.audio.submit()
         self.settings.setValue("channel", self.channel.value())
         self.on_status("connecting", "Opening control connection…")
         self.worker.submit("connect", address, self.channel.value())
@@ -541,33 +565,37 @@ class MainWindow(QMainWindow):
         if state == "demo":
             self.show_message("DEMO MODE · Simulated CMF Buds Pro 2. No Bluetooth commands are sent.", False)
         elif state == "connected":
-            self.show_message("Connected locally over Bluetooth. Changes are checked against the device.", False)
+            self.banner.hide()
         elif state == "disconnected":
             self.pending.clear()
+            self.requested.clear()
             self.demo_button.setEnabled(True)
         self.render(self.state)
 
     def show_message(self, text, error=False):
         self.banner.setText(text)
         self.banner.setStyleSheet("background: #35221e; border-color: #81503e;" if error else "")
+        self.banner.setVisible(error or self.connection not in ("connected", "demo") or text.startswith("DEMO"))
+        self.status_text.setText(text)
 
     def render(self, state):
         self.state = state
+        state = {**state, **self.requested}
         known = state.get("model") in ("B172", "B187")
         ready = self.connection in ("connected", "demo") and known
-        busy = bool(self.pending)
-        self.refresh_button.setEnabled(self.connection in ("connected", "demo") and not busy)
+        self.refresh_button.setEnabled(self.connection in ("connected", "demo") and "_refresh" not in self.pending)
         self.hero_status.setText("Demo mode" if self.connection == "demo" else "Connected" if ready else "Disconnected")
         for name, tile in self.batteries.items():
             tile.update_value(state.get("battery", {}).get(name))
         anc = state.get("anc")
         for title, b in self.anc_buttons.items():
-            b.setEnabled(ready and "anc" in state and not busy)
+            b.setEnabled(ready and "anc" in state and "anc" not in self.pending)
             b.setChecked(anc in ("High", "Mid", "Low", "Adaptive") if title == "Noise cancellation" else anc == title)
-        self.anc_level.setEnabled(ready and anc in ("High", "Mid", "Low", "Adaptive") and not busy)
+        self.anc_level.setEnabled(ready and anc in ("High", "Mid", "Low", "Adaptive") and "anc" not in self.pending)
         if anc in ("High", "Mid", "Low", "Adaptive"):
             self.anc_level.setCurrentText(anc)
         for key, control in self.controls.items():
+            busy = key in self.pending
             available = ready and key in state and not busy
             control.setEnabled(available)
             control.setToolTip("Applying and checking setting…" if busy else "Reported by earbuds" if key in state else "Unavailable until the device reports this setting")
@@ -583,30 +611,33 @@ class MainWindow(QMainWindow):
                 control.setCurrentIndex(max(0, control.findData(state.get(key, -1))))
             control.blockSignals(False)
         bass = state.get("bass")
-        self.bass_toggle.setEnabled(ready and bass is not None and not busy)
+        self.bass_toggle.setEnabled(ready and bass is not None and "bass" not in self.pending)
         self.bass_toggle.setChecked(bool(bass and bass[0]))
-        self.bass_slider.setEnabled(ready and bool(bass and bass[0]) and not busy)
+        self.bass_slider.setEnabled(ready and bool(bass and bass[0]) and "bass" not in self.pending)
         if bass and not self.bass_slider.isSliderDown():
             self.bass_slider.setValue(round(bass[1] * 2))
         self.bass_value.setText(f"{bass[1]:g} / 5" if bass else "—")
         for b in self.find_buttons:
-            b.setEnabled(ready and not busy)
+            b.setEnabled(ready and "find" not in self.pending)
         self.stop_button.setEnabled(ready)
         self.info.setText(f'Model {state.get("model", "—")}   ·   Firmware {state.get("firmware", "—")}')
         if self.connection == "connected" and state.get("model") and not known:
             self.show_message("This device is not a confirmed CMF Buds Pro 2. Settings are read-only to avoid sending commands for a different model.", True)
 
     def change(self, key, value):
-        if self.pending:
+        if key in self.pending:
             self.render(self.state)
             return
         self.pending.add(key)
-        self.show_message("Applying setting and waiting for the earbuds to confirm…", False)
+        if key != "find":
+            self.requested[key] = value
+        self.show_message("Applying…", False)
         self.render(self.state)
         self.worker.submit("write", key, value)
 
     def on_completed(self, key):
         self.pending.discard(key)
+        self.requested.pop(key, None)
         self.render(self.state)
 
     def bass_changed(self):
@@ -638,6 +669,7 @@ class MainWindow(QMainWindow):
             self.worker.submit("write", "find", (3, False))
 
     def refresh(self):
+        self.audio.submit()
         if self.connection in ("connected", "demo") and not self.pending:
             self.pending.add("_refresh")
             self.render(self.state)
@@ -660,14 +692,17 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.refresh_timer.stop()
+        self.audio.stop()
         app = QApplication.instance()
         app.setQuitOnLastWindowClosed(False)
-        self.worker.finished.connect(app.quit)
+        def finish():
+            if not self.worker.isRunning() and not self.audio.isRunning():
+                app.quit()
+        self.worker.finished.connect(finish)
+        self.audio.finished.connect(finish)
         self.worker.stop()
-        if not self.worker.wait(250):
-
+        if self.worker.isRunning() or self.audio.isRunning():
             self.hide()
-            pass
         else:
             QTimer.singleShot(0, app.quit)
         if self.tray:

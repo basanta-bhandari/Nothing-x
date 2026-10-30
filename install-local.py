@@ -17,10 +17,15 @@ icon = destination / "nothingx/assets/cmf-buds-pro-2/blue_case.png"
 def main():
     destination.mkdir(parents=True, exist_ok=True)
     shutil.copytree(source / "nothingx", destination / "nothingx", dirs_exist_ok=True,
-                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc"))
-    for name in ("LICENSE", "NOTICE", "requirements.txt", "setup.sh", "run.sh"):
+                    ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "bin"))
+    native_dir = destination / "nothingx/bin"
+    native_dir.mkdir(parents=True, exist_ok=True)
+    shutil.copy2(source / "nothingx/bin/nothingx-core", native_dir / ".nothingx-core.new")
+    os.replace(native_dir / ".nothingx-core.new", native_dir / "nothingx-core")
+    for name in ("LICENSE", "NOTICE", "requirements.txt", "setup.sh", "run.sh", "setup.py", "pyproject.toml", "MANIFEST.in"):
         shutil.copy2(source / name, destination / name)
     shutil.copytree(source / "licenses", destination / "licenses", dirs_exist_ok=True)
+    shutil.copytree(source / "native", destination / "native", dirs_exist_ok=True)
     subprocess.run(["sh", str(destination / "setup.sh")], check=True)
     binary.parent.mkdir(parents=True, exist_ok=True)
     binary.write_text("#!/bin/sh\nexec " + shlex.quote(str(destination / "run.sh")) + ' "$@"\n')

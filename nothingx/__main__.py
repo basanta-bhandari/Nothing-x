@@ -6,6 +6,8 @@ from pathlib import Path
 def main():
     parser = argparse.ArgumentParser(description="Unofficial Nothing X desktop companion for CMF Buds Pro 2")
     parser.add_argument("--demo", action="store_true", help="Use a simulated device; no Bluetooth access")
+    parser.add_argument("--connect", action="store_true", help="Connect to the saved earbuds on startup")
+    parser.add_argument("--page", choices=("overview", "sound", "audio", "device"), default="overview")
     parser.add_argument("--screenshot", type=Path, help="Save a demo preview and exit (implies --demo)")
     args = parser.parse_args()
     try:
@@ -25,7 +27,8 @@ def main():
     app.setStyle("Fusion")
     app.setStyleSheet(STYLE)
     app.setWindowIcon(QIcon(str(ASSET_DIR / "blue_case.png")))
-    window = MainWindow(demo=args.demo or bool(args.screenshot))
+    window = MainWindow(demo=args.demo or bool(args.screenshot), auto_connect=args.connect)
+    window.navigate(("overview", "sound", "audio", "device").index(args.page))
     if args.screenshot:
         window.resize(1140, 950)
     window.show()

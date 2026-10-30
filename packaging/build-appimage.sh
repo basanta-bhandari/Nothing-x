@@ -14,10 +14,19 @@ if ! "$PYTHON" -c 'import PyInstaller' >/dev/null 2>&1; then
     "$PYTHON" -m pip install 'pyinstaller==6.22.3'
 fi
 mkdir -p "$BUILD_DIR" "$(dirname -- "$OUTPUT")"
+cmake -S "$PROJECT_DIR/native" -B "$PROJECT_DIR/build/native" -DCMAKE_BUILD_TYPE=Release
+cmake --build "$PROJECT_DIR/build/native" -j2
+install -Dm755 "$PROJECT_DIR/build/native/nothingx-core" "$PROJECT_DIR/nothingx/bin/nothingx-core"
+cd "$PROJECT_DIR"
+CFLAGS='-O2 -march=x86-64 -mtune=generic' "$PYTHON" setup.py build_ext --inplace
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/usr/bin" "$BUILD_DIR/spec"
 PYINSTALLER_CONFIG_DIR="$BUILD_DIR/pyinstaller-cache" "$PYTHON" -m PyInstaller --noconfirm --clean --onedir --name nothingx \
     --paths "$PROJECT_DIR" \
+    --hidden-import nothingx.audio_ui --hidden-import nothingx.audio --hidden-import nothingx.core \
+    --hidden-import nothingx.backend --hidden-import nothingx.protocol --hidden-import nothingx.artwork \
+    --hidden-import PySide6.QtCore --hidden-import PySide6.QtGui --hidden-import PySide6.QtWidgets \
+    --add-binary "$PROJECT_DIR/nothingx/bin/nothingx-core:nothingx/bin" \
     --add-data "$PROJECT_DIR/nothingx/assets/cmf-buds-pro-2:nothingx/assets/cmf-buds-pro-2" \
     --add-data "$PROJECT_DIR/LICENSE:." --add-data "$PROJECT_DIR/NOTICE:." \
     --add-data "$PROJECT_DIR/licenses:licenses" \
