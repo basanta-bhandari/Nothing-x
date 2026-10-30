@@ -12,7 +12,7 @@ from .protocol import ANC, EQ
 from .artwork import COLORS, DEFAULT_COLOR, device_pixmap, device_thumbnail
 
 from .themes import DEFAULT_THEME, THEMES, stylesheet, theme_data
-from .components import DotLabel, palette
+from .components import DotLabel, BatteryRing, palette
 
 STYLE = stylesheet()
 
@@ -73,6 +73,10 @@ class BudsArt(QWidget):
             for x in range(8, 420, 13):
                 p.setBrush(QColor(palette()["border"]))
                 p.drawEllipse(QPointF(x, y), 0.8, 0.8)
+        p.setOpacity(.18)
+        p.setBrush(QColor(palette()["accent"]))
+        p.drawEllipse(QRectF(260, 13, 145, 145))
+        p.setOpacity(1)
         p.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
         for part, x in (("left", 20), ("right", 130)):
             p.drawPixmap(QRectF(x, 24, 90, 148), self.images[part], QRectF(127, 44, 258, 424))
@@ -94,8 +98,7 @@ class BatteryTile(QFrame):
         top.addStretch()
         top.addWidget(label(mark, "eyebrow"))
         box.addLayout(top)
-        self.value = label("—")
-        self.value.setStyleSheet("font-size: 29px; font-weight: 600; background: transparent;")
+        self.ring = BatteryRing()
         self.detail = label("Waiting for device", "muted")
         middle = QHBoxLayout()
         self.thumbnail = QLabel()
@@ -103,18 +106,16 @@ class BatteryTile(QFrame):
         self.part = part
         self.set_color(color)
         middle.addWidget(self.thumbnail)
-        stats = QVBoxLayout()
-        stats.setSpacing(1)
-        stats.addWidget(self.value)
-        stats.addWidget(self.detail)
-        middle.addLayout(stats, 1)
+        middle.addStretch()
+        middle.addWidget(self.ring)
         box.addLayout(middle)
+        box.addWidget(self.detail)
 
     def set_color(self, color):
         self.thumbnail.setPixmap(device_thumbnail(color, self.part, 58))
 
     def update_value(self, data):
-        self.value.setText(f'{data["level"]}%' if data else "—")
+        self.ring.set_value(data)
         self.detail.setText(("Last reported" if not data.get("available", True) else "Charging" if data["charging"] else "Battery level") if data else "Open case to update" if self.part == "case" else "Not reported")
         self.setToolTip("Keep a bud in the case with the lid open, then refresh. The closed case may not report its battery." if self.part == "case" else "")
 
@@ -308,8 +309,10 @@ class MainWindow(QMainWindow):
         hero.setMinimumHeight(190)
         row = QHBoxLayout()
         text = QVBoxLayout()
-        text.addWidget(label("CMF BY NOTHING", "eyebrow"))
+        self.product_brand = label("CMF BY NOTHING", "eyebrow")
+        text.addWidget(self.product_brand)
         name = label("Buds Pro 2")
+        self.product_name = name
         name.setStyleSheet("font-size: 33px; font-weight: 650; background: transparent;")
         text.addWidget(name)
         self.hero_status = label("Disconnected", "muted", True)
