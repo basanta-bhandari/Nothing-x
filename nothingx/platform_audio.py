@@ -66,6 +66,9 @@ class LinuxAudio(QObject):
         done = [False]
 
         def complete(code=-1, *_):
+            if self.closed:
+                self.processes.discard(process)
+                return
             if done[0]:
                 return
             done[0] = True
@@ -228,8 +231,11 @@ class LinuxAudio(QObject):
         self.timer.stop()
         self.retry.stop()
         self.subscriber.kill()
+        self.subscriber.waitForFinished(100)
         for process in tuple(self.processes):
             process.kill()
+            process.waitForFinished(100)
+        self.processes.clear()
 
 
 class UnavailableAudio(QObject):

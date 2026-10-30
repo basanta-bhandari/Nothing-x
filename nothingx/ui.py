@@ -541,6 +541,7 @@ class MainWindow(QMainWindow):
             self.address.setFocus()
             return
         self.settings.setValue("address", address)
+        save_preferences(address=address)
         self.audio.address = address
         self.audio.submit()
         self.settings.setValue("channel", self.channel.value())

@@ -12,6 +12,7 @@ class Discovery(QObject):
         super().__init__(parent)
         self.process = None
         self.connected = set()
+        self.closed = False
 
     def permission(self, callback):
         if sys.platform != "darwin":
@@ -47,6 +48,8 @@ class Discovery(QObject):
         timer.timeout.connect(process.kill)
 
         def done(code, *_):
+            if self.closed:
+                return
             timer.stop()
             output = bytes(process.readAllStandardOutput()).decode(errors="replace")
             devices = re.findall(r"^Device ([0-9A-Fa-f:]{17}) (.+)$", output, re.M)
@@ -89,5 +92,7 @@ class Discovery(QObject):
         return any(part in name for part in ("nothing", "cmf", "ear (", "headphone ("))
 
     def close(self):
+        self.closed = True
         if self.process:
             self.process.kill()
+            self.process.waitForFinished(100)
