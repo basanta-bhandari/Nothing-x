@@ -1,3 +1,5 @@
 PySide6-Essentials==6.12.0
 Cython>=3.1,<4
 setuptools>=68
+PySide6-Addons==6.12.0
+pyobjc-framework-IOBluetooth>=10; sys_platform == "darwin"

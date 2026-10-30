@@ -4,6 +4,7 @@ import time
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from .engine import Engine
+from .discovery import Discovery
 from .platform_audio import make_audio
 
 READ_KEYS = ("battery", "anc", "eq", "low_latency", "bass", "spatial", "in_ear", "dual", "codec", "firmware", "model")
@@ -25,6 +26,9 @@ class Service(QObject):
         self.backend = backend
         self.audio = make_audio(self)
         self.audio.event.connect(self.event)
+        self.discovery = Discovery(self)
+        self.discovery.devices.connect(lambda devices: self.emit("devices", devices=devices))
+        self.discovery.message.connect(lambda text, error: self.emit("message", text=text, error=error))
         self.phase = "disconnected"
         self.transport = None
         self.sequence = 0
@@ -294,7 +298,8 @@ class Service(QObject):
         try:
             action = request.get("action")
             if action == "connect":
-                self.connect_device(request.get("address", self.address), int(request.get("channel", 0)))
+                address, channel = request.get("address", self.address), int(request.get("channel", 0))
+                self.discovery.permission(lambda granted: self.connect_device(address, channel) if granted else self.emit("message", text="Bluetooth permission is required to connect.", error=True))
             elif action == "disconnect":
                 self.disconnect()
             elif action == "write":
@@ -307,7 +312,7 @@ class Service(QObject):
             elif action == "demo":
                 self.start_demo()
             elif action == "devices":
-                self.emit("devices", devices=[])
+                self.discovery.refresh()
             elif action == "quit":
                 self.close()
             else:
@@ -321,6 +326,7 @@ class Service(QObject):
         if not self.closed:
             self.disconnect()
             self.timer.stop()
+            self.discovery.close()
             self.audio.close()
             self.engine.close()
             self.closed = True
