@@ -728,7 +728,11 @@ class MainWindow(QMainWindow):
     def stop_ringing(self):
         if self.connection in ("connected", "demo"):
             profile = model_info(self.state.get("model"))
-            sides = (6,) if profile["kind"] in ("headphones", "neckband") else (2,) if profile.get("ring_legacy") else (2, 3)
+            sides = [2, 3]
+            if profile["kind"] in ("headphones", "neckband"):
+                sides = [6]
+            elif profile.get("ring_legacy"):
+                sides = [2]
             for side in sides:
                 self.worker.submit("write", "find", (side, False))
 
