@@ -1,3 +1,6 @@
 recursive-include native *.cpp *.hpp CMakeLists.txt
 recursive-include licenses *
 include LICENSE NOTICE
+recursive-include tools *.py
+recursive-include rust-engine Cargo.toml Cargo.lock *.rs
+include variants.json run.sh run-cpp.sh run-rust.sh setup.sh

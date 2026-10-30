@@ -580,7 +580,7 @@ class MainWindow(QMainWindow):
         for widget in (self.address, self.device_select, self.reload_button, self.demo_button):
             widget.setEnabled(state not in ("connecting", "connected", "demo"))
         if state == "demo":
-            self.show_message("DEMO MODE · Simulated CMF Buds Pro 2. No Bluetooth commands are sent.", False)
+            self.show_message("DEMO · Simulated audio device. No Bluetooth commands are sent.", False)
         elif state == "connected":
             self.banner.hide()
         elif state == "disconnected":

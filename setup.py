@@ -1,5 +1,7 @@
 from pathlib import Path
 import subprocess
+import os
+import sys
 
 from Cython.Build import cythonize
 from setuptools import Extension, setup
@@ -9,10 +11,7 @@ from setuptools.command.build_py import build_py
 class Build(build_py):
     def run(self):
         root = Path(__file__).resolve().parent
-        subprocess.run(["cmake", "-S", str(root / "native"), "-B", str(root / "build/native"), "-DCMAKE_BUILD_TYPE=Release"], check=True)
-        subprocess.run(["cmake", "--build", str(root / "build/native"), "-j2"], check=True)
-        self.mkpath(str(root / "nothingx/bin"))
-        self.copy_file(str(root / "build/native/nothingx-core"), str(root / "nothingx/bin/nothingx-core"))
+        subprocess.run([sys.executable, str(root / "tools/build_backends.py"), "--backend", os.environ.get("NOTHINGX_BACKEND", "cpp")], check=True)
         super().run()
 
 
