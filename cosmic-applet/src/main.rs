@@ -16,7 +16,15 @@ use tokio::{
     sync::mpsc,
 };
 
-const APP_ID: &str = "io.github.basanta_bhandari.NothingXApplet";
+#[cfg(not(feature = "rust-backend"))]
+const APP_ID: &str = "io.github.basanta_bhandari.NothingXApplet.Cpp";
+#[cfg(feature = "rust-backend")]
+const APP_ID: &str = "io.github.basanta_bhandari.NothingXApplet.Rust";
+const BACKEND: &str = if cfg!(feature = "rust-backend") {
+    "rust"
+} else {
+    "cpp"
+};
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -29,6 +37,7 @@ enum Message {
     Set(&'static str, Value),
     Audio(&'static str, Value, Option<String>),
     Tab(bool),
+    Theme(String),
     Surface(cosmic::surface::Action<Message>),
     OpenFull,
     FullClosed,
@@ -58,11 +67,11 @@ fn project_dir() -> PathBuf {
                 .unwrap_or_else(|| {
                     PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".local/share")
                 });
-            data.join("nothingx-cosmic/app")
+            data.join(format!("nothingx-{BACKEND}-applet"))
         })
 }
-fn theme_colors() -> (cosmic::iced::Color, cosmic::iced::Color) {
-    let config = std::env::var_os("NOTHINGX_PREFERENCES")
+fn preferences_path() -> PathBuf {
+    std::env::var_os("NOTHINGX_PREFERENCES")
         .map(PathBuf::from)
         .unwrap_or_else(|| {
             std::env::var_os("XDG_CONFIG_HOME")
@@ -71,7 +80,10 @@ fn theme_colors() -> (cosmic::iced::Color, cosmic::iced::Color) {
                     PathBuf::from(std::env::var_os("HOME").unwrap_or_default()).join(".config")
                 })
                 .join("nothingx/preferences.json")
-        });
+        })
+}
+fn theme_colors() -> [cosmic::iced::Color; 5] {
+    let config = preferences_path();
     let preferences: Value = std::fs::read(config)
         .ok()
         .and_then(|data| serde_json::from_slice(&data).ok())
@@ -93,7 +105,40 @@ fn theme_colors() -> (cosmic::iced::Color, cosmic::iced::Color) {
             .unwrap_or(fallback);
         cosmic::iced::Color::from_rgb8((rgb >> 16) as u8, (rgb >> 8) as u8, rgb as u8)
     };
-    (color("card", 0x171717), color("text", 0xf0efed))
+    [
+        color("panel", 0x171717),
+        color("text", 0xf0efed),
+        color("accent", 0xff343b),
+        color("card", 0x242424),
+        color("ink", 0x090909),
+    ]
+}
+
+fn themed_button(selected: bool) -> cosmic::theme::Button {
+    let [_, foreground, accent, card, ink] = theme_colors();
+    let style = move |disabled: bool, hover: bool| cosmic::widget::button::Style {
+        background: Some(if selected { accent } else { card }.into()),
+        text_color: Some(if selected { ink } else { foreground }),
+        border_radius: 22.0.into(),
+        border_width: if hover { 1.5 } else { 0.5 },
+        border_color: if hover {
+            accent
+        } else {
+            foreground.scale_alpha(0.25)
+        },
+        overlay: if disabled {
+            Some(card.scale_alpha(0.6).into())
+        } else {
+            None
+        },
+        ..Default::default()
+    };
+    cosmic::theme::Button::Custom {
+        active: Box::new(move |_, _| style(false, false)),
+        disabled: Box::new(move |_| style(true, false)),
+        hovered: Box::new(move |_, _| style(false, true)),
+        pressed: Box::new(move |_, _| style(false, true)),
+    }
 }
 
 fn bridge_subscription() -> Subscription<Message> {
@@ -102,10 +147,16 @@ fn bridge_subscription() -> Subscription<Message> {
             64,
             |mut output: futures::channel::mpsc::Sender<Message>| async move {
                 let directory = project_dir();
-                let backend = directory.join("nothingx/bin/nothingx-core");
+                let backend = directory.join(".venv/bin/python");
                 let mut child = match tokio::process::Command::new(&backend)
                     .current_dir(&directory)
-                    .arg("--auto")
+                    .args([
+                        "-m",
+                        "nothingx.service_entry",
+                        "--backend",
+                        BACKEND,
+                        "--auto",
+                    ])
                     .stdin(Stdio::piped())
                     .stdout(Stdio::piped())
                     .stderr(Stdio::null())
@@ -175,10 +226,9 @@ impl Applet {
     fn ready(&self, key: &str) -> bool {
         matches!(self.phase.as_str(), "connected" | "demo")
             && !self.pending.contains(key)
-            && matches!(
-                self.state.get("model").and_then(Value::as_str),
-                Some("B172" | "B187")
-            )
+            && self.state["capabilities"]
+                .as_array()
+                .is_some_and(|caps| caps.iter().any(|value| value.as_str() == Some(key)))
             && self.state.get(key).is_some()
     }
     fn battery(&self, part: &str) -> String {
@@ -189,10 +239,31 @@ impl Applet {
             .and_then(Value::as_u64)
             .map_or_else(|| "—".into(), |level| format!("{level}%"))
     }
+    fn artwork(&self, part: &str) -> cosmic::widget::icon::Handle {
+        let family = self
+            .state
+            .pointer("/device/artwork")
+            .and_then(Value::as_str)
+            .unwrap_or("cmf-buds-pro-2");
+        let relative = if family == "cmf-buds-pro-2" {
+            format!("cmf-buds-pro-2/blue_{part}.png")
+        } else {
+            format!("devices/{family}_{part}.png")
+        };
+        let image = project_dir().join("nothingx/assets").join(relative);
+        if image.is_file() {
+            icon::from_path(image)
+        } else {
+            icon::from_name("audio-headphones-symbolic").handle()
+        }
+    }
+    fn single_battery(&self) -> bool {
+        matches!(
+            self.state.pointer("/device/kind").and_then(Value::as_str),
+            Some("headphones" | "neckband")
+        )
+    }
     fn battery_cell(&self, part: &str, title: &str) -> Element<'_, Message> {
-        let image = project_dir()
-            .join("nothingx/assets/cmf-buds-pro-2")
-            .join(format!("blue_{part}.png"));
         let detail = if self
             .state
             .pointer(&format!("/battery/{part}/available"))
@@ -211,7 +282,7 @@ impl Applet {
             title
         };
         row![
-            icon::icon(icon::from_path(image)).size(44),
+            icon::icon(self.artwork(part)).size(44),
             column![
                 text::caption(detail.to_string()),
                 text::title3(self.battery(part))
@@ -222,15 +293,25 @@ impl Applet {
         .align_y(Alignment::Center)
         .into()
     }
-    fn option_button(&self, key: &'static str, value: &'static str) -> Element<'_, Message> {
+    fn option_button(&self, key: &'static str, value: &str) -> Element<'_, Message> {
         let selected = self.setting(key).and_then(Value::as_str) == Some(value);
         let mut control = button::standard(if selected {
             format!("✓ {value}")
         } else {
             value.to_string()
-        });
+        })
+        .class(themed_button(selected));
         if self.ready(key) {
             control = control.on_press(Message::Set(key, json!(value)));
+        }
+        control.into()
+    }
+    fn codec_button(&self, value: i64, title: &str) -> Element<'_, Message> {
+        let mut control = button::standard(title.to_string()).class(themed_button(
+            self.setting("codec").and_then(Value::as_i64) == Some(value),
+        ));
+        if self.ready("codec") {
+            control = control.on_press(Message::Set("codec", json!(value)));
         }
         control.into()
     }
@@ -254,9 +335,11 @@ impl Applet {
         .into()
     }
     fn panel_content(&self) -> Element<'_, Message> {
-        let image = icon::icon(icon::from_path(
-            project_dir().join("nothingx/assets/cmf-buds-pro-2/blue_left.png"),
-        ))
+        let image = icon::icon(self.artwork(if self.single_battery() {
+            "headphone"
+        } else {
+            "left"
+        }))
         .size(24);
         let l = self
             .state
@@ -266,10 +349,14 @@ impl Applet {
             .state
             .pointer("/battery/right/level")
             .and_then(Value::as_u64);
-        let level = match (l, r) {
-            (Some(l), Some(r)) => format!("{}%", l.min(r)),
-            (Some(l), None) | (None, Some(l)) => format!("{l}%"),
-            _ => "—".into(),
+        let level = if self.single_battery() {
+            self.battery("headphone")
+        } else {
+            match (l, r) {
+                (Some(l), Some(r)) => format!("{}%", l.min(r)),
+                (Some(l), None) | (None, Some(l)) => format!("{l}%"),
+                _ => "—".into(),
+            }
         };
         let value = self.core.applet.text(level).width(Length::Fixed(42.0));
         if matches!(
@@ -398,40 +485,33 @@ impl Applet {
         content.into()
     }
     fn buds_controls(&self) -> Element<'_, Message> {
-        let mut content = column![
-            text::heading("Noise control"),
-            row![
-                self.option_button("anc", "Off"),
-                self.option_button("anc", "Transparency"),
-                self.option_button("anc", "Adaptive")
-            ]
-            .spacing(4),
-            row![
-                self.option_button("anc", "Low"),
-                self.option_button("anc", "Mid"),
-                self.option_button("anc", "High")
-            ]
-            .spacing(4),
-            text::heading("Equalizer"),
-            row![
-                self.option_button("eq", "Dirac Opteo"),
-                self.option_button("eq", "Rock"),
-                self.option_button("eq", "Pop")
-            ]
-            .spacing(4),
-            row![
-                self.option_button("eq", "Electronic"),
-                self.option_button("eq", "Enhance vocals"),
-                self.option_button("eq", "Classical")
-            ]
-            .spacing(4)
-        ]
-        .spacing(9);
+        let mut content = column![].spacing(9);
+        for (key, title, field) in [
+            ("anc", "Noise control", "anc_modes"),
+            ("eq", "Equalizer", "eq_presets"),
+        ] {
+            if let Some(options) = self.state["device"][field]
+                .as_array()
+                .filter(|values| !values.is_empty())
+            {
+                content = content.push(text::heading(title));
+                for chunk in options.chunks(3) {
+                    let mut options_row = row![].spacing(4);
+                    for option in chunk {
+                        if let Some(value) = option.as_str().or_else(|| option["name"].as_str()) {
+                            options_row = options_row.push(self.option_button(key, value));
+                        }
+                    }
+                    content = content.push(options_row);
+                }
+            }
+        }
         if let Some(bass) = self.setting("bass").and_then(Value::as_array) {
             let enabled = bass.first().and_then(Value::as_bool).unwrap_or(false);
             let level = bass.get(1).and_then(Value::as_f64).unwrap_or(0.0);
-            let mut minus = button::standard("−");
-            let mut plus = button::standard("+");
+            let mut minus = button::standard("−").class(themed_button(false));
+            let mut plus = button::standard("+").class(themed_button(false));
+            let maximum = self.state["device"]["bass_max"].as_f64().unwrap_or(5.0);
             let mut toggle = widget::toggler(enabled);
             if self.ready("bass") {
                 minus = minus.on_press(Message::Set(
@@ -440,7 +520,7 @@ impl Applet {
                 ));
                 plus = plus.on_press(Message::Set(
                     "bass",
-                    json!([enabled, (level + 0.5).min(5.0)]),
+                    json!([enabled, (level + 0.5).min(maximum)]),
                 ));
                 toggle = toggle.on_toggle(move |v| Message::Set("bass", json!([v, level])));
             }
@@ -456,12 +536,31 @@ impl Applet {
                 .align_y(Alignment::Center),
             );
         }
-        content
-            .push(self.toggle_row("spatial", "Spatial audio"))
-            .push(self.toggle_row("low_latency", "Low latency"))
-            .push(self.toggle_row("in_ear", "In-ear detection"))
-            .push(self.toggle_row("dual", "Dual connection"))
-            .into()
+        for (key, title) in [
+            ("spatial", "Spatial audio"),
+            ("low_latency", "Low latency"),
+            ("in_ear", "In-ear detection"),
+            ("dual", "Dual connection"),
+            ("codec", "High-resolution audio"),
+        ] {
+            if self.state["capabilities"]
+                .as_array()
+                .is_some_and(|caps| caps.iter().any(|value| value.as_str() == Some(key)))
+            {
+                if key == "codec" {
+                    content = content.push(text::heading(title)).push(
+                        row![
+                            self.codec_button(0, "Standard"),
+                            self.codec_button(2, "LDAC")
+                        ]
+                        .spacing(4),
+                    );
+                } else {
+                    content = content.push(self.toggle_row(key, title));
+                }
+            }
+        }
+        content.into()
     }
 }
 
@@ -508,12 +607,16 @@ impl cosmic::Application for Applet {
             .padding([0, 5])
             .on_press_down(Message::TogglePopup)
             .class(cosmic::theme::Button::AppletIcon);
-        let tooltip = format!(
-            "Earbud battery · Left {} · Right {}\nCase {}",
-            self.battery("left"),
-            self.battery("right"),
-            self.battery("case")
-        );
+        let tooltip = if self.single_battery() {
+            format!("Headphone battery · {}", self.battery("headphone"))
+        } else {
+            format!(
+                "Earbud battery · Left {} · Right {}\nCase {}",
+                self.battery("left"),
+                self.battery("right"),
+                self.battery("case")
+            )
+        };
         self.core
             .applet
             .autosize_window(self.core.applet.applet_tooltip(
@@ -527,25 +630,38 @@ impl cosmic::Application for Applet {
     }
     fn view_window(&self, _: Id) -> Element<'_, Message> {
         let header = row![
-            icon::icon(icon::from_path(
-                project_dir().join("nothingx/assets/cmf-buds-pro-2/blue_case.png")
-            ))
+            icon::icon(self.artwork(if self.single_battery() {
+                "headphone"
+            } else {
+                "case"
+            }))
             .size(32),
-            text::title3("CMF Buds Pro 2"),
+            text::title3(
+                self.state
+                    .pointer("/device/name")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Nothing X")
+                    .to_string()
+            ),
             space::horizontal().width(Length::Fill),
             button::icon(icon::from_name("view-refresh-symbolic"))
                 .on_press(Message::Action("refresh"))
         ]
         .spacing(8)
         .align_y(Alignment::Center);
-        let batteries = row![
-            self.battery_cell("left", "Left"),
-            space::horizontal().width(Length::Fill),
-            self.battery_cell("right", "Right"),
-            space::horizontal().width(Length::Fill),
-            self.battery_cell("case", "Case")
-        ]
-        .align_y(Alignment::Center);
+        let batteries: Element<'_, Message> = if self.single_battery() {
+            self.battery_cell("headphone", "Battery")
+        } else {
+            row![
+                self.battery_cell("left", "Left"),
+                space::horizontal().width(Length::Fill),
+                self.battery_cell("right", "Right"),
+                space::horizontal().width(Length::Fill),
+                self.battery_cell("case", "Case")
+            ]
+            .align_y(Alignment::Center)
+            .into()
+        };
         let connection = if self.phase == "connected" {
             button::text("Disconnect").on_press(Message::Action("disconnect"))
         } else if self.phase == "connecting" {
@@ -554,14 +670,16 @@ impl cosmic::Application for Applet {
             button::text("Connect").on_press(Message::Action("connect"))
         };
         let tabs = row![
-            button::standard(if self.audio_tab { "Buds" } else { "✓ Buds" })
+            button::standard("Device")
+                .class(themed_button(!self.audio_tab))
                 .on_press(Message::Tab(false)),
-            button::standard(if self.audio_tab { "✓ Audio" } else { "Audio" })
+            button::standard("Audio")
+                .class(themed_button(self.audio_tab))
                 .on_press(Message::Tab(true))
         ]
         .spacing(6);
         let mut content = column![header, batteries].spacing(10).width(Length::Fill);
-        if self.state.pointer("/battery/case/level").is_none() {
+        if !self.single_battery() && self.state.pointer("/battery/case/level").is_none() {
             content = content.push(text::caption(
                 "Case battery: keep a bud inside with the lid open, then refresh.",
             ));
@@ -578,7 +696,37 @@ impl cosmic::Application for Applet {
                 self.buds_controls()
             })
             .push(button::text("Open full settings").on_press(Message::OpenFull));
-        let (background, foreground) = theme_colors();
+        let registry: Value =
+            std::fs::read(project_dir().join("nothingx/assets/themes/themes.json"))
+                .ok()
+                .and_then(|data| serde_json::from_slice(&data).ok())
+                .unwrap_or_else(|| json!({}));
+        let preferences: Value = std::fs::read(preferences_path())
+            .ok()
+            .and_then(|data| serde_json::from_slice(&data).ok())
+            .unwrap_or_else(|| json!({}));
+        if let Some(themes) = registry["themes"].as_array() {
+            let titles: Vec<String> = themes
+                .iter()
+                .map(|t| t["name"].as_str().unwrap_or("").to_string())
+                .collect();
+            let ids: Vec<String> = themes
+                .iter()
+                .map(|t| t["id"].as_str().unwrap_or("").to_string())
+                .collect();
+            let selected = ids
+                .iter()
+                .position(|id| Some(id.as_str()) == preferences["theme"].as_str());
+            content = content.push(widget::dropdown::popup_dropdown(
+                titles,
+                selected,
+                move |i| Message::Theme(ids[i].clone()),
+                self.popup.unwrap_or(Id::NONE),
+                Message::Surface,
+                |m| m,
+            ));
+        }
+        let [background, foreground, _, _, _] = theme_colors();
         self.core
             .applet
             .popup_container(
@@ -655,11 +803,10 @@ impl cosmic::Application for Applet {
                                 async move {
                                     let mut command =
                                         tokio::process::Command::new(project_dir().join("run.sh"));
-                                    command.arg("--connect").arg("--page").arg(if audio_tab {
-                                        "audio"
-                                    } else {
-                                        "overview"
-                                    });
+                                    command
+                                        .args(["--backend", BACKEND, "--connect"])
+                                        .arg("--page")
+                                        .arg(if audio_tab { "audio" } else { "overview" });
                                     match command.status().await {
                                         Ok(_) => Message::FullClosed,
                                         Err(error) => Message::FullFailed(format!(
@@ -695,6 +842,22 @@ impl cosmic::Application for Applet {
                 self.send(json!({"action":"audio","key":key,"value":value,"target":target}));
             }
             Message::Tab(value) => self.audio_tab = value,
+            Message::Theme(value) => {
+                let path = preferences_path();
+                let mut preferences: Value = std::fs::read(&path)
+                    .ok()
+                    .and_then(|data| serde_json::from_slice(&data).ok())
+                    .filter(Value::is_object)
+                    .unwrap_or_else(|| json!({}));
+                preferences["theme"] = json!(value);
+                if let Some(parent) = path.parent() {
+                    let _ = std::fs::create_dir_all(parent);
+                }
+                let temporary = path.with_extension(format!("{}.tmp", std::process::id()));
+                if std::fs::write(&temporary, preferences.to_string()).is_ok() {
+                    let _ = std::fs::rename(temporary, path);
+                }
+            }
             Message::OpenFull => {
                 self.opening_full = true;
                 self.send(json!({"action":"disconnect"}));
