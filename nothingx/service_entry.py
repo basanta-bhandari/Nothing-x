@@ -16,9 +16,13 @@ def main():
     from PySide6.QtCore import QCoreApplication, QObject, QTimer, Signal
     from .service import Service
     from .preferences import read_preferences
+    from .coordination import HandoffServer
     app = QCoreApplication(sys.argv[:1])
     service = Service(args.backend)
     state = {"desired": args.auto, "address": read_preferences().get("address", ""), "next_retry": 0.0}
+    handoff = HandoffServer(service, state, service)
+    if not handoff.available:
+        state["desired"] = False
 
     class Input(QObject):
         command = Signal(dict)
@@ -27,6 +31,9 @@ def main():
 
     def handle(request):
         action = request.get("action")
+        if action == "connect" and not handoff.available:
+            service.emit("message", text="Another Nothing X panel applet is already running.", error=True)
+            return
         if action == "connect" and not request.get("address"):
             state["desired"] = True
             state["next_retry"] = 0
@@ -65,8 +72,10 @@ def main():
     retry.setInterval(15000)
     retry.timeout.connect(lambda: service.discovery.refresh() if state["desired"] and service.phase == "disconnected" else None)
     retry.start()
-    if args.auto:
+    if args.auto and handoff.available:
         QTimer.singleShot(0, service.discovery.refresh)
+    elif not handoff.available:
+        QTimer.singleShot(0, lambda: service.emit("message", text="Another Nothing X panel applet is already running.", error=True))
     threading.Thread(target=reader, daemon=True).start()
     return app.exec()
 

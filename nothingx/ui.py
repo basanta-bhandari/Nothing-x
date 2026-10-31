@@ -190,7 +190,7 @@ class MainWindow(QMainWindow):
         self.controls = {}
         self._closing = False
         self.auto_connect_requested = auto_connect
-        self.backend_client = NativeClient(self)
+        self.backend_client = NativeClient(self, demo=demo)
         self.worker = Worker(self.backend_client, self)
         self.worker.state_changed.connect(self.render)
         self.worker.status.connect(self.on_status)
@@ -388,6 +388,7 @@ class MainWindow(QMainWindow):
         strength_row.addWidget(label("Cancellation strength", "muted"))
         strength_row.addStretch()
         self.anc_level = QComboBox()
+        self.anc_level.setMinimumWidth(140)
         self.anc_level.addItems(["Adaptive", "High", "Mid", "Low"])
         self.anc_level.activated.connect(lambda: self.change("anc", self.anc_level.currentText()))
         strength_row.addWidget(self.anc_level)
@@ -471,7 +472,7 @@ class MainWindow(QMainWindow):
         codec_line.addWidget(self.codec_select)
         s.addLayout(codec_line)
         box.addWidget(settings)
-        find, f = card("Find my earbuds", "Remove the earbuds from your ears before playing a locator sound.")
+        find, f = card("Find my device", "Remove the device from your ears before playing a locator sound.")
         locator = QHBoxLayout()
         self.find_buttons = []
         for title, side in [("Ring left", 2), ("Ring right", 3)]:
@@ -695,7 +696,7 @@ class MainWindow(QMainWindow):
         self.bass_slider.setEnabled(ready and "bass" in caps and bool(bass and bass[0]) and "bass" not in self.pending)
         if bass and not self.bass_slider.isSliderDown():
             self.bass_slider.setValue(round(bass[1] * 2))
-        self.bass_value.setText(f"{bass[1]:g} / 5" if bass else "—")
+        self.bass_value.setText(f"{bass[1]:g} / {profile.get('bass_max', 5)}" if bass else "—")
         for b in self.find_buttons:
             b.setEnabled(ready and "find" in caps and "find" not in self.pending)
         self.find_buttons[0].setText("Ring headphones" if single else "Ring device" if profile.get("ring_legacy") else "Ring left")
@@ -743,7 +744,7 @@ class MainWindow(QMainWindow):
     def find_bud(self, side):
         if model_info(self.state.get("model"))["kind"] in ("headphones", "neckband"):
             side = 6
-        result = QMessageBox.question(self, "Play locator sound?", "Take both earbuds out of your ears first. A locator tone will play for up to 15 seconds.")
+        result = QMessageBox.question(self, "Play locator sound?", "Remove the device from your ears first. A locator tone will play for up to 15 seconds.")
         if result == QMessageBox.StandardButton.Yes:
             self.change("find", (side, True))
             QTimer.singleShot(15000, self.stop_ringing)

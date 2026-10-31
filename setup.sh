@@ -44,4 +44,8 @@ if [ "$(uname -s)" = Darwin ]; then
     done
 fi
 .venv/bin/python -c 'from PySide6.QtCore import qVersion; from PySide6.QtBluetooth import QBluetoothSocket; print("Nothing X runtime ready: Qt " + qVersion())'
-printf 'Start with ./run.sh --backend %s\n' "$NX_BACKEND"
+if [ "$NX_BACKEND" = all ]; then
+    printf '%s\n' 'Start with ./run-cpp.sh or ./run-rust.sh'
+else
+    printf 'Start with ./run.sh --backend %s\n' "$NX_BACKEND"
+fi

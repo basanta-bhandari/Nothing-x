@@ -1,9 +1,10 @@
 [Desktop Entry]
 Type=Application
-Name=Nothing X Linux
-GenericName=CMF Earbud Controller
-Exec=nothingx-linux
+Name=Nothing X
+GenericName=Nothing audio controls
+Exec=AppRun
 Icon=nothingx-linux
 Terminal=false
 Categories=AudioVideo;Audio;
 StartupNotify=true
+Keywords=Nothing;CMF;Buds;Headphones;Bluetooth;

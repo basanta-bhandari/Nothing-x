@@ -212,6 +212,8 @@ class Service(QObject):
             self.emit("completed", key="_refresh")
 
     def write(self, key, value):
+        if isinstance(value, tuple):
+            value = list(value)
         if self.phase not in ("connected", "demo"):
             raise ValueError("Connect your device first.")
         if key in self.pending and key != "find":

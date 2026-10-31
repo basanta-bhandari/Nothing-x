@@ -1,5 +1,0 @@
-#!/usr/bin/python
-import sys
-sys.path.insert(0, "/usr/lib/nothingx-linux")
-from nothingx.__main__ import main
-sys.exit(main())

@@ -23,7 +23,7 @@ class Worker(QObject):
     def receive(self, event):
         kind = event.get("type")
         if kind == "state":
-            state = event.get("state", {})
+            state = dict(event.get("state", {}))
             if isinstance(state.get("bass"), list):
                 state["bass"] = tuple(state["bass"])
             self.state_changed.emit(state)

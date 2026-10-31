@@ -32,11 +32,3 @@ def variant_id(backend=None, distribution=None):
 def package_format(system=None):
     system = system or platform.system()
     return {"Linux": "AppImage", "Darwin": "dmg"}.get(system)
-
-
-def backend_path(root, backend=None):
-    root = Path(root)
-    backend = backend_name(backend)
-    if backend == "cpp":
-        return root / "bin/nothingx-core"
-    return root / "bin/nothingx-rust-core"
