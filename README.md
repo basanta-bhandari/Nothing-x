@@ -2,11 +2,11 @@
 
 Nothing and CMF audio controls for Linux, with a native COSMIC panel applet.
 
-[Try the browser demo](https://basanta-bhandari.github.io/Nothing-x/) · [Published downloads](https://github.com/basanta-bhandari/Nothing-x/releases/latest)
+[Try the browser demo](https://basanta.cc/nothing-x/) · [Published downloads](https://github.com/basanta-bhandari/Nothing-x/releases/latest)
 
 ![Nothing X desktop with blue CMF Buds Pro 2 and their charging case](screenshots/overview.png)
 
-An unofficial desktop companion/client for adjusting your earbuds or headphones . It started with **CMF Buds Pro 2 on CachyOS/COSMIC**, then grew into a shared interface for other Nothing and CMF models.
+An unofficial desktop companion/client for adjusting your earbuds or headphones. It started with **CMF Buds Pro 2 on CachyOS/COSMIC**, then grew into a shared interface for other Nothing and CMF models.
 
 - **Device controls:** noise cancellation, transparency, EQ, Ultra Bass, spatial audio and model-specific settings.
 - **Desktop audio:** volume, balance, Bluetooth profiles, microphones and application routing through PipeWire.
@@ -54,7 +54,7 @@ Screenshots use simulated data and show the **0.5 desktop preview**. Published p
 
 ## Choose a version
 
-It has the same UI accross, two interchangeable backends, three distributions: **six variants**.
+It has the same UI across, two interchangeable backends, three distributions: **six variants**.
 
 | Distribution | C++ + Python/Cython | Rust + Python/Cython |
 | --- | --- | --- |
