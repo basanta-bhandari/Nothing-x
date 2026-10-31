@@ -6,12 +6,13 @@ Nothing and CMF audio controls for Linux, with a native COSMIC panel applet.
 
 ![Nothing X desktop with blue CMF Buds Pro 2 and their charging case](screenshots/overview.png)
 
-An unofficial desktop companion for adjusting your earbuds or headphones without reaching for your phone. It started with **CMF Buds Pro 2 on CachyOS/COSMIC**, then grew into a shared interface for other Nothing and CMF models.
+An unofficial desktop companion/client for adjusting your earbuds or headphones . It started with **CMF Buds Pro 2 on CachyOS/COSMIC**, then grew into a shared interface for other Nothing and CMF models.
 
 - **Device controls:** noise cancellation, transparency, EQ, Ultra Bass, spatial audio and model-specific settings.
 - **Desktop audio:** volume, balance, Bluetooth profiles, microphones and application routing through PipeWire.
 - **Personal settings:** saved sound presets, desktop device names, six themes, startup preferences and version-aware updates.
 - **Quick access:** battery readings and essential controls from the COSMIC panel.
+(I.e anything that is available on the mobile nothing-x app)
 
 Controls depend on the model and firmware. CMF Buds Pro 2 is the primary development device; other catalog profiles have not all been verified on hardware. Case readings are cached and marked **Last reported** when unavailable.
 
@@ -49,11 +50,11 @@ Controls depend on the model and firmware. CMF Buds Pro 2 is the primary develop
 
 </details>
 
-Screenshots use simulated data and show the **0.5 desktop preview**. Published packages and the browser demo currently use the earlier release. The demo lets you explore simulated controls without downloading anything or connecting hardware.
+Screenshots use simulated data and show the **0.5 desktop preview**. Published packages and the browser demo currently use the earlier release. The demo lets you see simulated controls without downloading anything or connecting hardware.
 
 ## Choose a version
 
-One interface, two interchangeable native backends, three distributions: **six variants**.
+It has the same UI accross, two interchangeable backends, three distributions: **six variants**.
 
 | Distribution | C++ + Python/Cython | Rust + Python/Cython |
 | --- | --- | --- |
