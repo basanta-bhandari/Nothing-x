@@ -5,6 +5,9 @@ from pathlib import Path
 
 
 def main():
+    if len(sys.argv) > 2 and sys.argv[1] == "--service-backend":
+        from .service_entry import main as service_main
+        return service_main(["--backend", sys.argv[2], "--daemon", "--auto"])
     if len(sys.argv) > 1 and sys.argv[1] == "--apply-update":
         from .update_install import main as apply_update
         return apply_update(sys.argv[2:])
@@ -41,7 +44,7 @@ def main():
     window = MainWindow(demo=args.demo or bool(args.screenshot), auto_connect=args.connect, demo_model=args.demo_model)
     if args.theme:
         window.apply_theme(args.theme)
-    window.navigate(("overview", "sound", "audio", "device").index(args.page))
+    window.navigate({"overview": 0, "sound": 0, "audio": 1, "device": 2}[args.page])
     if args.screenshot:
         window.resize(1140, 950)
     window.show()

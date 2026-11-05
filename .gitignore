@@ -11,3 +11,4 @@ pkg/
 target/
 *.so
 *.dylib
+PROMOTION_DRAFTS.md

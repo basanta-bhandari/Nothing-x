@@ -1,60 +1,65 @@
 # Nothing X
 
-Nothing and CMF audio controls for Linux, with a native COSMIC panel applet.
+Desktop controls for Nothing and CMF audio devices on Linux, including a native COSMIC panel applet.
 
-[Try the browser demo](https://basanta.cc/nothing-x/) · [Published downloads](https://github.com/basanta-bhandari/Nothing-x/releases/latest)
+[Try the interactive demo](https://basanta.cc/nothing-x/) · [Download the latest release](https://github.com/basanta-bhandari/Nothing-x/releases/latest)
 
-![Nothing X desktop with blue CMF Buds Pro 2 and their charging case](screenshots/overview.png)
+![Nothing X showing blue CMF Buds Pro 2, their full-size charging case, and device controls](screenshots/overview.png)
 
-An unofficial desktop companion/client for adjusting your earbuds or headphones. It started with **CMF Buds Pro 2 on CachyOS/COSMIC**, then grew into a shared interface for other Nothing and CMF models.
+Nothing X is an unofficial desktop companion for the controls that usually live in the Nothing X mobile app. It began with CMF Buds Pro 2 on CachyOS/COSMIC and now has a shared interface for Nothing and CMF earbuds and headphones.
 
-- **Device controls:** noise cancellation, transparency, EQ, Ultra Bass, spatial audio and model-specific settings.
-- **Desktop audio:** volume, balance, Bluetooth profiles, microphones and application routing through PipeWire.
-- **Personal settings:** saved sound presets, desktop device names, six themes, startup preferences and version-aware updates.
-- **Quick access:** battery readings and essential controls from the COSMIC panel.
-(I.e anything that is available on the mobile nothing-x app)
+## What it does
 
-Controls depend on the model and firmware. CMF Buds Pro 2 is the primary development device; other catalog profiles have not all been verified on hardware. Case readings are cached and marked **Last reported** when unavailable.
+- Change noise cancellation, transparency, equalizer, Ultra Bass, spatial audio, low-latency mode, and other device features when supported.
+- View left, right, and case battery readings; case values stay visible as **Last reported** when the case is unavailable.
+- Manage Bluetooth profiles, output volume and balance, microphones, and per-application routing through PipeWire.
+- Save sound presets, choose from six themes, enable startup, and check for an update that matches the installed variant.
+- Keep essential device controls and battery information in a compact COSMIC panel applet.
 
-## Screenshots
+Feature availability depends on the connected model and its firmware. CMF Buds Pro 2 is the primary development device; other model profiles remain hardware-dependent.
 
-<table>
-<tr>
-<td><img src="screenshots/appearance.png" alt="Six theme choices with image previews" width="440"><br><b>Themes</b> — Nothing, Porcelain, Glacier, Verdant, Alloy and Ion.</td>
-<td><img src="screenshots/audio.png" alt="Output volume, balance and Bluetooth codec controls" width="440"><br><b>Audio</b> — output controls and available Bluetooth profiles.</td>
-</tr>
-<tr>
-<td><img src="screenshots/applications.png" alt="Separate application volume, mute and routing controls" width="440"><br><b>Application routing</b> — choose where each stream goes.</td>
-<td><img src="screenshots/headphones.png" alt="Nothing Headphone 1 in the Porcelain theme" width="440"><br><b>Headphones</b> — the same interface adapts to the device.</td>
-</tr>
-</table>
+## Demo and screenshots
+
+The [browser demo](https://basanta.cc/nothing-x/) runs entirely with simulated device and audio data. It is useful for trying the navigation, controls, themes, and three example device profiles without installing anything.
+
+| Device controls | Themes |
+| --- | --- |
+| ![Noise control, spatial audio, equalizer, Ultra Bass, and playback controls](screenshots/overview.png) | ![Six theme choices with their visual previews](screenshots/appearance.png) |
+
+| Audio and routing | Headphone support |
+| --- | --- |
+| ![Output volume, balance, and Bluetooth profile choices](screenshots/audio.png) | ![Nothing Headphone (1) in the Porcelain theme](screenshots/headphones.png) |
+
+| Applications | Microphone |
+| --- | --- |
+| ![Independent stream volume, mute, and output routing](screenshots/applications.png) | ![Input selection and microphone volume controls](screenshots/microphone.png) |
+
+| Device preferences | Glacier theme |
+| --- | --- |
+| ![Codec, in-ear detection, desktop name, and locator controls](screenshots/settings.png) | ![The main screen in the Glacier theme](screenshots/glacier.png) |
 
 <details>
-<summary>See every theme, microphone controls and device settings</summary>
+<summary>All six themes</summary>
 
-<table>
-<tr>
-<td><img src="screenshots/overview.png" alt="Nothing theme" width="280"><br>Nothing</td>
-<td><img src="screenshots/porcelain.png" alt="Porcelain theme" width="280"><br>Porcelain</td>
-<td><img src="screenshots/glacier.png" alt="Glacier theme" width="280"><br>Glacier</td>
-</tr>
-<tr>
-<td><img src="screenshots/verdant.png" alt="Verdant theme" width="280"><br>Verdant</td>
-<td><img src="screenshots/alloy.png" alt="Alloy theme" width="280"><br>Alloy</td>
-<td><img src="screenshots/ion.png" alt="Ion theme" width="280"><br>Ion</td>
-</tr>
-</table>
+| Nothing | Porcelain | Verdant |
+| --- | --- | --- |
+| ![Nothing theme](screenshots/overview.png) | ![Porcelain theme](screenshots/porcelain.png) | ![Verdant theme](screenshots/verdant.png) |
 
-![Microphone selection and input volume](screenshots/microphone.png)
-![Device preferences, desktop name and locator controls](screenshots/settings.png)
+| Glacier | Alloy | Ion |
+| --- | --- | --- |
+| ![Glacier theme](screenshots/glacier.png) | ![Alloy theme](screenshots/alloy.png) | ![Ion theme](screenshots/ion.png) |
 
 </details>
 
-Screenshots use simulated data and show the **0.5 desktop preview**. Published packages and the browser demo currently use the earlier release. The demo lets you see simulated controls without downloading anything or connecting hardware.
+The screenshots show the 0.5 desktop preview using simulated data. The published packages currently represent the earlier public release.
 
-## Choose a version
+## Why it exists
 
-It has the same UI across, two interchangeable backends, three distributions: **six variants**.
+Nothing and CMF devices expose useful controls through their phone companion app, while Linux desktop users also need quick access to audio routing, Bluetooth profiles, and device status. Nothing X brings those workflows together in one focused desktop interface instead of splitting them across the phone and system settings.
+
+## Choose a build
+
+The same UI is available with two native backends and three distribution methods: six variants in total.
 
 | Distribution | C++ + Python/Cython | Rust + Python/Cython |
 | --- | --- | --- |
@@ -62,9 +67,14 @@ It has the same UI across, two interchangeable backends, three distributions: **
 | COSMIC panel applet | `--backend cpp` | `--backend rust` |
 | Clone and run | `./run-cpp.sh` | `./run-rust.sh` |
 
-Published AppImages are Linux x86-64 builds made on CachyOS. Older distributions may need a source build. macOS `.app`/`.dmg` build support is included, but Mac packages and hardware validation are still pending.
+Published AppImages target Linux x86-64 and are built on CachyOS. To run one, make it executable and launch it:
 
-To run a downloaded AppImage, make it executable with `chmod +x NothingX-cpp-x86_64.AppImage`, then run `./NothingX-cpp-x86_64.AppImage` (substitute `rust` for the Rust build).
+```bash
+chmod +x NothingX-cpp-x86_64.AppImage
+./NothingX-cpp-x86_64.AppImage
+```
+
+macOS `.app` and `.dmg` build scripts are included, although prebuilt Mac packages and hardware validation are still pending.
 
 ## Run from source
 
@@ -80,59 +90,62 @@ cd Nothing-x
 ./run-cpp.sh
 ```
 
-Setup creates `.venv`, installs the Python dependencies and builds the selected backend. Pair and connect your device in system Bluetooth settings first.
+`setup.sh` creates `.venv`, installs Python requirements, and builds the selected engine. Pair the device in system Bluetooth settings before opening the app.
 
-For the Rust variant, install [Rust](https://www.rust-lang.org/tools/install) 1.85 or newer, run `./setup.sh --backend rust`, then `./run-rust.sh`. Use `--backend all` during setup to build both engines.
+For Rust, install [Rust](https://www.rust-lang.org/tools/install) 1.85 or newer, then use `./setup.sh --backend rust` and `./run-rust.sh`. Use `--backend all` to build both engines.
 
-To explore the desktop interface without connecting earbuds:
+Run the desktop UI with simulated data:
 
 ```bash
 ./run-cpp.sh --demo
 ```
 
-To add the full app to your application launcher:
+Install a searchable desktop entry:
 
 ```bash
 .venv/bin/python install-local.py --backend cpp
 ```
 
-For the current COSMIC applet, build with **Rust 1.93+**, then install:
+Build and install the current COSMIC applet with Rust 1.93 or newer:
 
 ```bash
 .venv/bin/python tools/build_applets.py --backend cpp
 .venv/bin/python install-cosmic.py --backend cpp
 ```
 
-Replace `cpp` with `rust` for the other variant. Add **Nothing X** in COSMIC Settings → Desktop → Panel → Applets.
+Replace `cpp` with `rust` for the other backend, then add **Nothing X** in COSMIC Settings → Desktop → Panel → Applets.
 
-**In the app:** use **Theme** at the top right for appearance, **Audio** for Output/Microphone/Applications, and **Settings → App** for startup and updates.
+## How it is built
 
-## Stack and design
-
-| Part | Tools |
+| Layer | Technology |
 | --- | --- |
-| Desktop UI | [Python](https://www.python.org/) 3.11+, [PySide6 / Qt Widgets](https://doc.qt.io/qtforpython-6/), [Cython](https://cython.org/) |
-| Native protocol engines | C++20 with [json-c](https://github.com/json-c/json-c), or Rust |
-| Linux connections | [BlueZ](https://www.bluez.org/), nonblocking RFCOMM sockets and Qt's event loop |
-| Linux audio | [PipeWire](https://pipewire.org/), its PulseAudio interface and [WirePlumber](https://pipewire.pages.freedesktop.org/wireplumber/) |
+| Desktop interface | [Python](https://www.python.org/) 3.11+, [PySide6 / Qt Widgets](https://doc.qt.io/qtforpython-6/), and [Cython](https://cython.org/) |
+| Device engines | C++20 with [json-c](https://github.com/json-c/json-c), or Rust |
+| Bluetooth | [BlueZ](https://www.bluez.org/), nonblocking RFCOMM sockets, and the Qt event loop |
+| Audio | [PipeWire](https://pipewire.org/), its PulseAudio interface, and [WirePlumber](https://pipewire.pages.freedesktop.org/wireplumber/) |
 | COSMIC applet | Rust and [libcosmic](https://github.com/pop-os/libcosmic) |
-| Builds | [CMake](https://cmake.org/), Cargo, Cython and [PyInstaller](https://pyinstaller.org/) |
+| Packaging | [CMake](https://cmake.org/), Cargo, Cython, and [PyInstaller](https://pyinstaller.org/) |
 
-The UI and panel talk to one local control service. That service uses the selected native engine for device messages and state, keeping presentation separate from connection handling.
+The window and panel applet share a local service. That service owns device communication and state while the UI renders controls and receives updates. This keeps a single device connection alive even when the full window and applet are both open.
 
-The project grew through practical fixes:
+The main engineering work focused on making a desktop-first experience feel coherent:
 
-| Challenge | Approach |
+| Problem | Solution |
 | --- | --- |
-| Too many controls competing for attention | Focused Device, Audio and Settings sections; compact panel controls. |
-| Connection races when opening or closing windows | An independent service, shared messaging and exclusive ownership of its socket. |
-| Repeated audio refreshes causing unnecessary work | Filter self-generated events, coalesce slider changes and publish changed state. |
-| Missing case readings and inconsistent controls | Cache reported battery values, label stale readings and standardize switch/slider behavior. |
+| Controls felt crowded | Grouped them into Device, Audio, and Settings, with a shorter panel experience. |
+| Window and panel competed for connections | Moved connection ownership into one independent local service. |
+| Audio changes made the UI refresh too often | Filtered self-generated events and coalesced frequent slider updates. |
+| Case battery and widgets looked inconsistent | Cached reported readings, labelled stale values, and used shared switch and slider components. |
 
-<details>
-<summary>Development and packaging</summary>
+## Development and packaging
 
-Use `./setup.sh --backend cpp --no-cython` on a fresh checkout for Python-only UI iteration. After editing already-compiled UI modules, rebuild them with:
+For Python-only UI iteration, use:
+
+```bash
+./setup.sh --backend cpp --no-cython
+```
+
+After editing compiled UI modules, rebuild them with:
 
 ```bash
 .venv/bin/python setup.py build_ext --inplace
@@ -140,23 +153,24 @@ Use `./setup.sh --backend cpp --no-cython` on a fresh checkout for Python-only U
 
 Rebuild an engine with `.venv/bin/python tools/build_backends.py --backend cpp` or `rust`.
 
-The main source areas are [`nothingx/`](nothingx/) for the UI/service, [`native/`](native/) for C++, [`rust-engine/`](rust-engine/) for Rust, and [`cosmic-applet/`](cosmic-applet/) for the panel.
+Key directories:
 
-For Linux AppImages, install [appimagetool](https://github.com/AppImage/appimagetool) and the build requirements:
+- [`nothingx/`](nothingx/) — UI, audio integration, and local service
+- [`native/`](native/) — C++ engine
+- [`rust-engine/`](rust-engine/) — Rust engine
+- [`cosmic-applet/`](cosmic-applet/) — COSMIC panel applet
+
+For an AppImage, install [appimagetool](https://github.com/AppImage/appimagetool), then run:
 
 ```bash
 .venv/bin/python -m pip install -r requirements-build.txt
 packaging/build-appimage.sh cpp
 ```
 
-On a Mac, install Python, CMake, pkg-config, json-c and Rust as needed, for example through [Homebrew](https://brew.sh/). Run the same setup command; it creates a local app bundle. To build a disk image on that Mac:
+On macOS, install Python, CMake, pkg-config, json-c, and Rust, for example with [Homebrew](https://brew.sh/). Run the same setup command, then build a disk image with:
 
 ```bash
 .venv/bin/python packaging/build-macos.py --backend cpp
 ```
 
-Use `rust` instead of `cpp` to build the other variant.
-
-</details>
-
-Licensed under [MIT](LICENSE). See [NOTICE](NOTICE) for assets and dependencies. This project is not affiliated with Nothing or CMF.
+Licensed under [MIT](LICENSE). See [NOTICE](NOTICE) for assets and dependencies. Nothing X is not affiliated with Nothing or CMF.

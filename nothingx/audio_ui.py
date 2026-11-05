@@ -1,7 +1,8 @@
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QSlider, QLayout
+from PySide6.QtWidgets import QWidget, QVBoxLayout, QHBoxLayout, QComboBox, QSlider, QLayout, QTabWidget
 
 from .ui import label, button, card, Switch
+from .widgets import Slider as QSlider
 
 
 class AudioPage(QWidget):
@@ -18,10 +19,20 @@ class AudioPage(QWidget):
         self.box.setSpacing(16)
         self.summary = label("Reading audio devices…", "muted", True)
         self.box.addWidget(self.summary)
+        self.tabs = QTabWidget()
+        self.box.addWidget(self.tabs)
+        self.sections = []
+        for name in ("Output", "Microphone", "Applications"):
+            page = QWidget()
+            layout = QVBoxLayout(page)
+            layout.setContentsMargins(0, 0, 0, 0)
+            layout.setSpacing(14)
+            self.tabs.addTab(page, name)
+            self.sections.append(layout)
         profile, layout = card("Bluetooth audio")
         self.profile = QComboBox()
         self.profile.setAccessibleName("Bluetooth audio profile and codec")
-        self.profile.activated.connect(lambda: self.worker.submit("profile", self.profile.currentData()))
+        self.profile.activated.connect(lambda index: self.worker.submit("profile", self.profile.currentData()))
         layout.addWidget(self.profile)
         self.format = label("—", "muted", True)
         layout.addWidget(self.format)
@@ -31,15 +42,16 @@ class AudioPage(QWidget):
         self.auto_headset_row.setStyleSheet("background: transparent;")
         headset_row = QHBoxLayout(self.auto_headset_row)
         headset_row.setContentsMargins(0, 0, 0, 0)
-        headset_row.addWidget(label("Allow headset mode for the buds’ microphone", wrap=True), 1)
+        headset_row.addWidget(label("Use headset mode for Bluetooth microphones", wrap=True), 1)
         self.auto_headset = Switch()
         self.auto_headset.setAccessibleName("Allow automatic headset mode for Bluetooth microphones")
         headset_row.addWidget(self.auto_headset)
         self.auto_headset.clicked.connect(lambda value: self.worker.submit("auto_headset", value))
         self.auto_headset.setToolTip("WirePlumber setting for all Bluetooth headsets. Headset mode reduces playback quality.")
         layout.addWidget(self.auto_headset_row)
-        self.box.addWidget(profile)
-        output, layout = card("Earbud output")
+        self.profile_card = profile
+        profile.hide()
+        output, layout = card("Device output")
         self.output_volume = self.slider(layout, "Volume", 0, 100, lambda value: self.worker.submit("output_volume", value))
         self.balance = self.slider(layout, "Balance", -100, 100, lambda value: self.worker.submit("balance", value), balance=True)
         line = QHBoxLayout()
@@ -51,22 +63,30 @@ class AudioPage(QWidget):
         self.default_output.setMinimumHeight(38)
         line.addWidget(self.default_output)
         layout.addLayout(line)
-        self.box.addWidget(output)
+        self.sections[0].addWidget(output)
+        profile_toggle = button("Bluetooth profile and codec")
+        profile_toggle.setCheckable(True)
+        profile_toggle.toggled.connect(profile.setVisible)
+        self.sections[0].addWidget(profile_toggle)
+        self.sections[0].addWidget(profile)
+        self.sections[0].addStretch()
         microphone, layout = card("Microphone")
         self.input = QComboBox()
         self.input.setAccessibleName("Default microphone")
-        self.input.activated.connect(lambda: self.worker.submit("default_input", target=self.input.currentData()))
+        self.input.activated.connect(lambda index: self.worker.submit("default_input", target=self.input.currentData()))
         layout.addWidget(self.input)
         self.input_volume = self.slider(layout, "Input volume", 0, 100,
                                         lambda value: self.worker.submit("input_volume", value, self.input.currentData()))
         self.input_mute = Switch("Mute microphone")
         self.input_mute.clicked.connect(lambda value: self.worker.submit("input_mute", value, self.input.currentData()))
         layout.addWidget(self.input_mute)
-        self.box.addWidget(microphone)
+        self.sections[1].addWidget(microphone)
+        self.sections[1].addStretch()
         applications, self.apps = card("Applications")
         self.application_card = applications
-        self.box.addWidget(applications)
-        self.box.addStretch()
+        self.sections[2].addWidget(applications)
+        self.sections[2].addStretch()
+
         self.worker.state_changed.connect(self.render)
 
     def slider(self, layout, title, minimum, maximum, callback, balance=False):
@@ -121,12 +141,13 @@ class AudioPage(QWidget):
         self.updating = True
         self.state = state
         available = bool(state.get("available"))
-        self.summary.setText(state.get("server", "Audio") if available else state.get("error", "Audio server unavailable"))
+        self.summary.setText(((state.get("sink") or {}).get("description") or "Choose an output in system audio settings") if available else state.get("error", "Audio unavailable"))
         card_state, sink = state.get("card") or {}, state.get("sink") or {}
         self.combo(self.profile, [(p["description"], p["name"]) for p in card_state.get("profiles", [])], card_state.get("profile"))
         capabilities = state.get("capabilities", {})
         profiles_available = capabilities.get("profiles", True)
         self.application_card.setVisible(capabilities.get("streams", True))
+        self.tabs.setTabVisible(2, capabilities.get("streams", True))
         if not card_state and available:
             self.profile.addItem("Managed by macOS" if not profiles_available else "Connect your Nothing audio device in Bluetooth settings")
             self.profile.setEnabled(False)

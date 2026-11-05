@@ -1,4 +1,5 @@
 import json
+import re
 import os
 import sys
 
@@ -22,6 +23,7 @@ class LinuxAudio(QObject):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.address = ""
+        self.subscription_buffer = ""
         self.state = {}
         self.closed = False
         self.processes = set()
@@ -29,6 +31,11 @@ class LinuxAudio(QObject):
         self.dirty = False
         self.auto_headset = None
         self.pending = {}
+        self.controls = {}
+        self.control_timer = QTimer(self)
+        self.control_timer.setSingleShot(True)
+        self.control_timer.setInterval(45)
+        self.control_timer.timeout.connect(self.flush_controls)
         self.timer = QTimer(self)
         self.timer.setSingleShot(True)
         self.timer.setInterval(40)
@@ -102,8 +109,10 @@ class LinuxAudio(QObject):
             self.retry.start()
 
     def changed(self):
-        self.subscriber.readAllStandardOutput()
-        if not self.closed:
+        self.subscription_buffer += bytes(self.subscriber.readAllStandardOutput()).decode(errors="replace")
+        lines = self.subscription_buffer.split("\n")
+        self.subscription_buffer = lines.pop()
+        if not self.closed and any(re.search(r" on (?:sink-input|source-output|sink|source|server|card)(?: #|$)", line) for line in lines):
             self.timer.start()
 
     def refresh(self):
@@ -130,10 +139,12 @@ class LinuxAudio(QObject):
             return
         self.querying = False
         if any(value is None for value in self.pending.values()):
-            self.state = {"available": False, "error": "Audio server unavailable. Start pipewire-pulse and WirePlumber."}
+            state = {"available": False, "error": "Audio server unavailable. Start pipewire-pulse and WirePlumber."}
         else:
-            self.state = self.normalize(self.pending)
-        self.event.emit({"type": "audio", "state": self.state})
+            state = self.normalize(self.pending)
+        if state != self.state:
+            self.state = state
+            self.event.emit({"type": "audio", "state": self.state})
         if self.dirty:
             self.timer.start()
 
@@ -161,6 +172,21 @@ class LinuxAudio(QObject):
                 "capabilities": {"profiles": True, "balance": True, "streams": True, "microphones": True}}
 
     def request(self, key, value=None, target=None):
+        if self.closed:
+            return
+        if key in ("output_volume", "balance", "input_volume", "stream_volume"):
+            self.controls[(key, target)] = value
+            if not self.control_timer.isActive():
+                self.control_timer.start()
+            return
+        self.execute_request(key, value, target)
+
+    def flush_controls(self):
+        controls, self.controls = self.controls, {}
+        for (key, target), value in controls.items():
+            self.execute_request(key, value, target)
+
+    def execute_request(self, key, value=None, target=None):
         if key == "address":
             self.address = str(value or "").upper()
             self.refresh()
@@ -228,6 +254,8 @@ class LinuxAudio(QObject):
 
     def close(self):
         self.closed = True
+        self.control_timer.stop()
+        self.controls.clear()
         self.timer.stop()
         self.retry.stop()
         self.subscriber.kill()
@@ -241,8 +269,13 @@ class LinuxAudio(QObject):
 class UnavailableAudio(QObject):
     event = Signal(dict)
 
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.state = {}
+
     def refresh(self):
-        self.event.emit({"type": "audio", "state": {"available": False, "error": "Audio integration is unavailable on this platform."}})
+        self.state = {"available": False, "error": "Audio integration is unavailable on this platform."}
+        self.event.emit({"type": "audio", "state": self.state})
 
     def request(self, key, value=None, target=None):
         self.refresh()

@@ -1,6 +1,6 @@
 pkgname=('nothingx-cpp' 'nothingx-rust')
 pkgbase=nothingx
-pkgver=0.4.0
+pkgver=0.5.0
 pkgrel=1
 pkgdesc='Nothing and CMF audio controls with a shared Qt frontend'
 arch=('x86_64' 'aarch64')

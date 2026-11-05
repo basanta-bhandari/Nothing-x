@@ -6,13 +6,13 @@
       "id": "nothing",
       "name": "Nothing",
       "reference": "nothing1.png",
-      "background": "#0c0c0c",
-      "panel": "#171717",
-      "card": "#242424",
+      "background": "#050505",
+      "panel": "#111111",
+      "card": "#1e1e1e",
       "border": "#363636",
       "text": "#f0efed",
       "muted": "#9d9d9a",
-      "accent": "#ff343b",
+      "accent": "#f1f1ef",
       "ink": "#090909"
     },
     {

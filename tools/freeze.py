@@ -17,7 +17,7 @@ build = root / "build/freeze" / backend
 assets = build / "assets"
 if assets.exists():
     shutil.rmtree(assets)
-shutil.copytree(root / "nothingx/assets", assets, ignore=shutil.ignore_patterns("references", "build.json"))
+shutil.copytree(root / "nothingx/assets", assets, ignore=shutil.ignore_patterns("build.json"))
 sys.path.insert(0, str(root))
 from nothingx import __version__
 (assets / "build.json").write_text(json.dumps({"backend": backend, "distribution": args.distribution, "version": __version__, **({"source": str(root)} if args.distribution == "manual" else {})}) + "\n")

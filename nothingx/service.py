@@ -1,18 +1,21 @@
 from collections import deque
 import time
+import sys
 
 from PySide6.QtCore import QObject, QTimer, Signal
 
 from .engine import Engine
+from . import __version__
 from .discovery import Discovery
 from .platform_audio import make_audio
+from .preferences import read_preferences, save_preferences
 
 READ_KEYS = ("battery", "anc", "eq", "low_latency", "bass", "spatial", "in_ear", "dual", "codec", "firmware", "model")
 DEMO_PAYLOADS = {
     "model": [0x72, 0xB1], "battery": [3, 2, 92, 3, 88, 4, 76],
     "anc": [1, 4, 0, 2, 4, 0], "eq": [0, 0], "in_ear": [1, 1, 1],
     "low_latency": [2], "spatial": [0], "bass": [1, 6], "dual": [1], "codec": [0],
-    "firmware": list(b"Demo 0.4.0"),
+    "firmware": list(("Demo " + __version__).encode()),
 }
 
 
@@ -41,6 +44,8 @@ class Service(QObject):
         self.closed = False
         self.ringing = {}
         self.address = ""
+        self.battery_cache = {}
+        self.connect_attempt = 0
         self.ports = deque()
         self.deadline = 0
         self.timer = QTimer(self)
@@ -48,17 +53,24 @@ class Service(QObject):
         self.timer.timeout.connect(self.tick)
         self.timer.start()
         self.last_poll = time.monotonic()
-        QTimer.singleShot(0, lambda: self.emit("ready", backend=backend, version="0.4.0"))
+        QTimer.singleShot(0, lambda: self.emit("ready", backend=backend, version=__version__))
 
     def emit(self, kind, **values):
         self.event.emit({"type": kind, **values})
 
     def status(self, phase, detail):
         self.phase = phase
-        self.emit("status", phase=phase, detail=detail)
+        self.emit("status", phase=phase, detail=detail, address=self.address)
 
     def state(self):
-        return self.engine.call("state")
+        state = self.engine.call("state")
+        if state.get("model") and self.battery_cache:
+            battery = dict(state.get("battery", {}))
+            for part, value in self.battery_cache.items():
+                if part not in battery:
+                    battery[part] = {**value, "available": False}
+            state["battery"] = battery
+        return state
 
     def next_sequence(self):
         self.sequence = self.sequence % 255 + 1
@@ -66,8 +78,16 @@ class Service(QObject):
 
     def feed(self, data):
         result = self.engine.call("feed", bytes=list(data))
-        if result["state"] != self.last_state:
-            self.last_state = result["state"]
+        if not self.demo and self.address and self.phase in ("connecting", "connected") and result["state"].get("battery"):
+            fresh = {key: value for key, value in result["state"]["battery"].items() if value.get("available", True)}
+            if any(self.battery_cache.get(key) != value for key, value in fresh.items()):
+                self.battery_cache.update(fresh)
+                devices = read_preferences().get("device_state", {})
+                devices[self.address] = {"battery": self.battery_cache, "seen": int(time.time()), "model": result["state"].get("model", "")}
+                save_preferences(device_state=devices)
+        display = self.state()
+        if display != self.last_state:
+            self.last_state = display
             self.emit("state", state=self.last_state)
         for frame in result["frames"]:
             if self.active and frame["command"] == self.active["command"] and frame["sequence"] == self.active["sequence"]:
@@ -104,8 +124,16 @@ class Service(QObject):
         from PySide6.QtBluetooth import QBluetoothAddress
         if QBluetoothAddress(address).isNull() or not 0 <= channel <= 30:
             raise ValueError("Select a paired device or enter its Bluetooth address.")
+        if address.upper() == self.address and self.phase in ("connected", "connecting"):
+            self.emit("state", state=self.state())
+            self.status(self.phase, "Connected" if self.phase == "connected" else "Connecting…")
+            return
         self.disconnect()
+        self.connect_attempt += 1
         self.address = address.upper()
+        self.battery_cache = read_preferences().get("device_state", {}).get(self.address, {}).get("battery", {})
+        self.audio.request("address", self.address)
+        save_preferences(address=self.address)
         self.ports = deque([channel] if channel else [15, 16, 17, *range(1, 15), *range(18, 31)])
         self.status("connecting", "Connecting…")
         self.next_port()
@@ -124,7 +152,11 @@ class Service(QObject):
             self.disconnect("Control connection unavailable. Connect the device in Bluetooth settings and close other companion apps.")
             return
         port = self.ports.popleft()
-        socket = QBluetoothSocket(QBluetoothServiceInfo.Protocol.RfcommProtocol, self)
+        if sys.platform == "linux":
+            from .linux_bluetooth import LinuxBluetoothSocket
+            socket = LinuxBluetoothSocket(self)
+        else:
+            socket = QBluetoothSocket(QBluetoothServiceInfo.Protocol.RfcommProtocol, self)
         self.transport = socket
         self.deadline = time.monotonic() + 1.2
         socket.connected.connect(lambda s=socket: self.socket_connected(s))
@@ -151,6 +183,9 @@ class Service(QObject):
     def model_read(self, frame):
         if self.phase != "connecting":
             return
+        if frame is None:
+            self.disconnect("Device connected but did not report its model. Try reconnecting.")
+            return
         self.status("connected", "Connected")
         self.last_poll = time.monotonic()
         self.refresh()
@@ -176,6 +211,7 @@ class Service(QObject):
             socket.disconnectFromService()
             socket.deleteLater()
         self.ringing.clear()
+        self.battery_cache = {}
         self.demo = False
         self.active = None
         self.requests.clear()
@@ -327,7 +363,12 @@ class Service(QObject):
                 self.refresh()
                 self.audio.refresh()
             elif action == "audio":
-                self.audio.request(request.get("key", "refresh"), request.get("value"), request.get("target"))
+                if request.get("key") == "address" and self.phase in ("connected", "connecting") and request.get("value", "").upper() != self.address:
+                    self.audio.refresh()
+                else:
+                    self.audio.request(request.get("key", "refresh"), request.get("value"), request.get("target"))
+            elif action == "preferences":
+                self.emit("preferences", **read_preferences())
             elif action == "demo":
                 self.start_demo(request.get("model", "B172"))
             elif action == "devices":
