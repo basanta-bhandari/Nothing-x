@@ -153,6 +153,17 @@ After editing compiled UI modules, rebuild them with:
 
 Rebuild an engine with `.venv/bin/python tools/build_backends.py --backend cpp` or `rust`.
 
+Run the device-service regression checks against each built engine:
+
+```bash
+NOTHINGX_BACKEND=cpp .venv/bin/python tests/test_beta.py -v
+NOTHINGX_BACKEND=rust .venv/bin/python tests/test_beta.py -v
+NOTHINGX_BACKEND=cpp .venv/bin/python tests/test_ui.py -v
+NOTHINGX_BACKEND=rust .venv/bin/python tests/test_ui.py -v
+```
+
+These checks use simulated transports and cover fragmented responses, request ordering, timeouts, reconnect queues, locator deadlines, and every model profile. They do not connect to physical devices. Hardware testing is still needed for firmware-specific behavior and macOS.
+
 Key directories:
 
 - [`nothingx/`](nothingx/) — UI, audio integration, and local service

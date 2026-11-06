@@ -4,10 +4,10 @@
 #include <cmath>
 #include <cstdio>
 
-uint16_t crc16(const std::vector<uint8_t> &bytes, size_t length) {
+uint16_t crc16(const std::vector<uint8_t> &bytes, size_t length, size_t offset) {
   uint16_t crc = 0xffff;
   for (size_t i = 0; i < length; ++i) {
-    crc ^= bytes[i];
+    crc ^= bytes[offset + i];
     for (int bit = 0; bit < 8; ++bit)
       crc = (crc >> 1) ^ ((crc & 1) ? 0xa001 : 0);
   }
@@ -33,32 +33,34 @@ std::vector<uint8_t> encode(const Command &command, uint8_t sequence) {
 }
 std::vector<Frame> decode(std::vector<uint8_t> &buffer) {
   std::vector<Frame> result;
-  while (!buffer.empty()) {
-    if (buffer[0] != 0x55) {
-      buffer.erase(buffer.begin());
+  size_t offset = 0;
+  while (offset < buffer.size()) {
+    if (buffer[offset] != 0x55) {
+      ++offset;
       continue;
     }
-    if (buffer.size() < 8)
+    if (buffer.size() - offset < 8)
       break;
-    uint16_t control = buffer[1] | (buffer[2] << 8),
-             length = buffer[5] | (buffer[6] << 8);
+    uint16_t control = buffer[offset + 1] | (buffer[offset + 2] << 8),
+             length = buffer[offset + 5] | (buffer[offset + 6] << 8);
     if (length > 4096 || (control & 0xff00) > 0x0100) {
-      buffer.erase(buffer.begin());
+      ++offset;
       continue;
     }
     size_t end = 8 + length, total = end + ((control & 0x20) ? 2 : 0);
-    if (buffer.size() < total)
+    if (buffer.size() - offset < total)
       break;
     if ((control & 0x20) &&
-        crc16(buffer, end) != (buffer[end] | (buffer[end + 1] << 8))) {
-      buffer.erase(buffer.begin());
+        crc16(buffer, end, offset) != (buffer[offset + end] | (buffer[offset + end + 1] << 8))) {
+      ++offset;
       continue;
     }
-    result.push_back({uint16_t((buffer[3] | (buffer[4] << 8)) | 0x8000),
-                      buffer[7],
-                      {buffer.begin() + 8, buffer.begin() + end}});
-    buffer.erase(buffer.begin(), buffer.begin() + total);
+    result.push_back({uint16_t((buffer[offset + 3] | (buffer[offset + 4] << 8)) | 0x8000),
+                      buffer[offset + 7],
+                      {buffer.begin() + offset + 8, buffer.begin() + offset + end}});
+    offset += total;
   }
+  buffer.erase(buffer.begin(), buffer.begin() + offset);
   return result;
 }
 Json parse_frame(const Frame &frame) {

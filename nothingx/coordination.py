@@ -43,6 +43,9 @@ class ServiceBroker(QObject):
         self.service.event.connect(self.broadcast)
 
     def send(self, peer, event):
+        if peer.bytesToWrite() > 1024 * 1024:
+            peer.abort()
+            return
         peer.write(json.dumps(event, separators=(",", ":")).encode() + b"\n")
 
     def accept(self):
@@ -52,7 +55,7 @@ class ServiceBroker(QObject):
             peer.readyRead.connect(lambda client=peer: self.read(client))
             peer.disconnected.connect(lambda client=peer: self.release(client))
             self.send(peer, {"type": "ready", "backend": self.service.backend, "shared": True, "address": self.service.address})
-            self.send(peer, self.latest.get("state", {"type": "state", "state": self.service.state()}))
+            self.send(peer, self.latest["state"] if "state" in self.latest else {"type": "state", "state": self.service.state()})
             self.send(peer, self.latest.get("status", {"type": "status", "phase": self.service.phase, "detail": "Connected" if self.service.phase == "connected" else "Disconnected"}))
             if self.service.audio.state:
                 self.send(peer, {"type": "audio", "state": self.service.audio.state})

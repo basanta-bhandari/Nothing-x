@@ -1,4 +1,4 @@
-from PySide6.QtCore import Qt, QSettings, QTimer, QRectF, QSize
+from PySide6.QtCore import Qt, QSettings, QTimer, QRectF, QSize, QFileSystemWatcher
 from PySide6.QtGui import QColor, QIcon, QPainter, QKeySequence, QShortcut
 from PySide6.QtWidgets import (QApplication, QMainWindow, QWidget, QFrame, QLabel,
     QPushButton, QCheckBox, QComboBox, QSpinBox, QSlider, QHBoxLayout, QVBoxLayout,
@@ -12,7 +12,7 @@ from .core import NativeClient
 from .artwork import COLORS, DEFAULT_COLOR, device_pixmap
 from .themes import DEFAULT_THEME, THEMES, stylesheet, apply_palette
 from .components import DotLabel, palette
-from .preferences import read_preferences, save_preferences
+from .preferences import preference_path, read_preferences, save_preferences
 from .models import MODELS, model_info
 from .discovery import Discovery
 from .widgets import ModeButton, Segments, Switch, ThemeSwatch, Slider
@@ -169,12 +169,20 @@ class MainWindow(QMainWindow):
         self._tray()
         self.refresh_timer = QTimer(self)
         self.refresh_timer.setInterval(30000)
-        self.refresh_timer.timeout.connect(self.refresh)
+        self.refresh_timer.timeout.connect(lambda: self.refresh() if self.isVisible() else None)
         self.refresh_timer.start()
+        self.status_timer = QTimer(self)
+        self.status_timer.setSingleShot(True)
+        self.status_timer.setInterval(4000)
+        self.status_timer.timeout.connect(lambda: self.status_text.setText(""))
         self.theme_timer = QTimer(self)
-        self.theme_timer.setInterval(1000)
+        self.theme_timer.setSingleShot(True)
+        self.theme_timer.setInterval(80)
         self.theme_timer.timeout.connect(self.sync_theme)
-        self.theme_timer.start()
+        directory = preference_path().parent
+        directory.mkdir(parents=True, exist_ok=True)
+        self.theme_watcher = QFileSystemWatcher([str(directory)], self)
+        self.theme_watcher.directoryChanged.connect(lambda _: self.theme_timer.start())
         self.bass_timer = QTimer(self)
         self.bass_timer.setSingleShot(True)
         self.bass_timer.setInterval(180)
@@ -712,7 +720,8 @@ class MainWindow(QMainWindow):
             self.pending.clear()
             self.requested.clear()
             self.preset_queue.clear()
-            self.banner.setText("Put both buds in the case and open the case before pressing Connect. It makes life easier.")
+            self.preset_active = None
+            self.banner.setText("Turn on your headphones and connect them in Bluetooth settings before pressing Connect." if model_info(self.display_model)["kind"] in ("headphones", "neckband") else "Put both buds in the case and open the case before pressing Connect. It makes life easier.")
             self.banner.show()
         self.render(self.state)
 
@@ -722,7 +731,7 @@ class MainWindow(QMainWindow):
             self.banner.show()
         else:
             self.status_text.setText("Saved" if text == "Updated" else text)
-            QTimer.singleShot(4000, lambda: self.status_text.setText(""))
+            self.status_timer.start()
 
     def render(self, state):
         self.state = state
@@ -964,6 +973,7 @@ class MainWindow(QMainWindow):
             event.ignore()
             return
         self.refresh_timer.stop()
+        self.status_timer.stop()
         self.theme_timer.stop()
         self.bass_timer.stop()
         self.updater.close()

@@ -28,9 +28,12 @@ class Discovery(QObject):
             callback(status == Qt.PermissionStatus.Granted)
 
     def refresh(self):
-        self.permission(self.scan)
+        if not self.closed:
+            self.permission(self.scan)
 
     def scan(self, granted):
+        if self.closed:
+            return
         if not granted:
             self.message.emit("Allow Bluetooth access for Nothing X in macOS System Settings → Privacy & Security → Bluetooth.", True)
             self.devices.emit([])
@@ -46,11 +49,18 @@ class Discovery(QObject):
         timer.setSingleShot(True)
         timer.setInterval(5000)
         timer.timeout.connect(process.kill)
+        finished = [False]
 
         def done(code, *_):
-            if self.closed:
+            if finished[0]:
                 return
+            finished[0] = True
             timer.stop()
+            if self.process is process:
+                self.process = None
+            if self.closed:
+                process.deleteLater()
+                return
             output = bytes(process.readAllStandardOutput()).decode(errors="replace")
             devices = re.findall(r"^Device ([0-9A-Fa-f:]{17}) (.+)$", output, re.M)
             devices = sorted(devices, key=lambda item: (not self.matches(item[1]), item[1].lower()))
@@ -63,11 +73,9 @@ class Discovery(QObject):
             if code:
                 self.message.emit("BlueZ is unavailable. Start bluetooth.service and pair your device in Bluetooth settings.", True)
             process.deleteLater()
-            if self.process is process:
-                self.process = None
 
         process.finished.connect(done)
-        process.errorOccurred.connect(lambda error: self.message.emit("Install bluez-utils to list paired devices.", True) if error == QProcess.ProcessError.FailedToStart else None)
+        process.errorOccurred.connect(lambda error: done(-1) if error == QProcess.ProcessError.FailedToStart else None)
         process.start("bluetoothctl", ["devices", "Paired"])
         timer.start()
 

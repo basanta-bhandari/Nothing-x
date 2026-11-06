@@ -49,9 +49,8 @@ class Service(QObject):
         self.ports = deque()
         self.deadline = 0
         self.timer = QTimer(self)
-        self.timer.setInterval(20)
+        self.timer.setSingleShot(True)
         self.timer.timeout.connect(self.tick)
-        self.timer.start()
         self.last_poll = time.monotonic()
         QTimer.singleShot(0, lambda: self.emit("ready", backend=backend, version=__version__))
 
@@ -61,9 +60,10 @@ class Service(QObject):
     def status(self, phase, detail):
         self.phase = phase
         self.emit("status", phase=phase, detail=detail, address=self.address)
+        self.schedule_tick()
 
-    def state(self):
-        state = self.engine.call("state")
+    def state(self, state=None):
+        state = self.engine.call("state") if state is None else state
         if state.get("model") and self.battery_cache:
             battery = dict(state.get("battery", {}))
             for part, value in self.battery_cache.items():
@@ -85,7 +85,7 @@ class Service(QObject):
                 devices = read_preferences().get("device_state", {})
                 devices[self.address] = {"battery": self.battery_cache, "seen": int(time.time()), "model": result["state"].get("model", "")}
                 save_preferences(device_state=devices)
-        display = self.state()
+        display = self.state(result["state"])
         if display != self.last_state:
             self.last_state = display
             self.emit("state", state=self.last_state)
@@ -95,13 +95,19 @@ class Service(QObject):
         return result
 
     def request(self, op, callback=None, timeout=.6, urgent=False, **values):
+        if self.closed:
+            raise RuntimeError("The control service is closed.")
+        if len(self.requests) >= 128:
+            raise ValueError("Too many pending requests. Wait for the device to respond.")
         sequence = self.next_sequence()
         packet = self.engine.call(op, sequence=sequence, **values)
         job = {"command": packet["command"], "sequence": sequence, "bytes": bytes(packet["bytes"]),
                "callback": callback, "timeout": timeout, "urgent": urgent}
-        self.requests.appendleft(job) if urgent else self.requests.append(job)
-        if urgent and self.active and not self.active["urgent"]:
-            self.complete(None)
+        if urgent:
+            index = next((i for i, queued in enumerate(self.requests) if not queued["urgent"]), len(self.requests))
+            self.requests.insert(index, job)
+        else:
+            self.requests.append(job)
         self.pump()
 
     def pump(self):
@@ -109,8 +115,11 @@ class Service(QObject):
             return
         self.active = self.requests.popleft()
         self.active["deadline"] = time.monotonic() + self.active["timeout"]
-        if self.transport.write(self.active["bytes"]) < 0:
+        transport = self.transport
+        written = transport.write(self.active["bytes"])
+        if written < 0 and transport is self.transport:
             self.disconnect("Bluetooth write failed.")
+        self.schedule_tick()
 
     def complete(self, frame):
         if not self.active:
@@ -119,6 +128,7 @@ class Service(QObject):
         if request["callback"]:
             request["callback"](frame)
         self.pump()
+        self.schedule_tick()
 
     def connect_device(self, address, channel=0):
         from PySide6.QtBluetooth import QBluetoothAddress
@@ -146,6 +156,7 @@ class Service(QObject):
             previous.deleteLater()
         self.active = None
         self.requests.clear()
+        self.engine.call("reset")
         if self.phase != "connecting":
             return
         if not self.ports:
@@ -165,11 +176,13 @@ class Service(QObject):
         socket.disconnected.connect(lambda s=socket: self.socket_error(s))
         from PySide6.QtCore import QIODevice
         socket.connectToService(QBluetoothAddress(self.address), port, QIODevice.OpenModeFlag.ReadWrite)
+        self.schedule_tick()
 
     def socket_connected(self, socket):
         if socket is not self.transport:
             return
         self.deadline = 0
+        self.schedule_tick()
 
         def handshake(frame):
             if frame is None:
@@ -192,7 +205,10 @@ class Service(QObject):
 
     def socket_read(self, socket):
         if socket is self.transport:
-            self.feed(bytes(socket.readAll()))
+            try:
+                self.feed(bytes(socket.readAll()))
+            except (ValueError, RuntimeError) as error:
+                self.disconnect(f"Invalid device response: {error}. Reconnect to try again.")
 
     def socket_error(self, socket):
         if socket is not self.transport:
@@ -219,6 +235,7 @@ class Service(QObject):
         for key in self.pending:
             self.emit("completed", key=key)
         self.pending.clear()
+        self.deadline = 0
         self.engine.call("reset")
         self.last_state = {}
         self.emit("state", state={})
@@ -295,6 +312,7 @@ class Service(QObject):
         self.pending.discard(key)
         self.emit("message", text="Updated" if confirmed else "The device did not confirm this setting. Showing the last reported value.", error=not confirmed)
         self.emit("completed", key=key)
+        self.schedule_tick()
 
     def start_demo(self, model="B172"):
         from .models import model_info
@@ -335,6 +353,22 @@ class Service(QObject):
         command = self.engine.call("read", key=key)["command"]
         self.feed(bytes(self.engine.call("packet", command=command, payload=payload)["bytes"]))
 
+    def schedule_tick(self):
+        if self.closed:
+            self.timer.stop()
+            return
+        deadlines = list(self.ringing.values())
+        if self.phase == "connecting" and self.deadline:
+            deadlines.append(self.deadline)
+        if self.active:
+            deadlines.append(self.active["deadline"])
+        if self.phase == "connected":
+            deadlines.append(self.last_poll + 25)
+        if deadlines:
+            self.timer.start(max(1, int((min(deadlines) - time.monotonic()) * 1000) + 1))
+        else:
+            self.timer.stop()
+
     def tick(self):
         now = time.monotonic()
         if self.phase == "connecting" and self.deadline and now >= self.deadline:
@@ -343,11 +377,13 @@ class Service(QObject):
             self.complete(None)
         for side, deadline in tuple(self.ringing.items()):
             if now >= deadline:
+                self.ringing.pop(side, None)
                 self.write("find", [side, False])
         if self.phase == "connected" and now - self.last_poll >= 25:
             self.last_poll = now
             if "battery" not in self.refresh_keys:
                 self.request("read", key="battery")
+        self.schedule_tick()
 
     def submit(self, request):
         try:

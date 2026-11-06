@@ -13,7 +13,13 @@ suffix = "dylib" if sys.platform == "darwin" else "so"
 output = root / "nothingx/bin"
 output.mkdir(exist_ok=True)
 if args.backend in ("cpp", "all"):
-    subprocess.run(["cmake", "-S", str(root / "native"), "-B", str(root / "build/native"), "-DCMAKE_BUILD_TYPE=Release"], check=True)
+    cache = root / "build/native/CMakeCache.txt"
+    fresh = []
+    if cache.exists():
+        expected = f"CMAKE_HOME_DIRECTORY:INTERNAL={root / 'native'}"
+        if expected not in cache.read_text().splitlines():
+            fresh = ["--fresh"]
+    subprocess.run(["cmake", *fresh, "-S", str(root / "native"), "-B", str(root / "build/native"), "-DCMAKE_BUILD_TYPE=Release"], check=True)
     subprocess.run(["cmake", "--build", str(root / "build/native"), "--target", "nothingx_cpp", "-j2"], check=True)
     shutil.copy2(root / f"build/native/libnothingx_cpp.{suffix}", output / f"libnothingx_cpp.{suffix}")
 if args.backend in ("rust", "all"):

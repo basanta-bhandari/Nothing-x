@@ -142,7 +142,24 @@ class NativeClient(QObject):
         if self.stopping:
             return
         if not self.running:
+            if request.get("action") in ("write", "audio") and (request.get("action") == "write" or request.get("key") not in ("address", "refresh")):
+                self.event.emit({"type": "message", "text": "Controls are reconnecting. Try again once connected.", "error": True})
+                self.event.emit({"type": "completed" if request.get("action") == "write" else "audio_completed", "key": request.get("key", "")})
+                return
+            if request in self.waiting:
+                return
+            if len(self.waiting) >= 128:
+                self.event.emit({"type": "message", "text": "Controls are busy. Try again shortly.", "error": True})
+                return
             self.waiting.append(request)
+            if not self.starting:
+                self.spawned = False
+                self.deadline = time.monotonic() + 8
+                if self.socket is None:
+                    self.start()
+                else:
+                    self.starting = True
+                    self.retry.start()
             return
         if self.remote:
             self.socket.write(json.dumps(request, separators=(",", ":")).encode() + b"\n")

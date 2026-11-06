@@ -25,6 +25,8 @@ class Engine:
         self.call("configure", profiles=MODELS)
 
     def call(self, op, **values):
+        if not self.context:
+            raise RuntimeError("The native backend is closed.")
         request = json.dumps({"op": op, **values}, separators=(",", ":")).encode()
         pointer = self.library.nx_engine_call(self.context, request)
         if not pointer:

@@ -305,39 +305,42 @@ impl Engine {
                     return Err("Packet buffer limit exceeded".into());
                 }
                 let mut frames = vec![];
-                while !self.buffer.is_empty() {
-                    if self.buffer[0] != 0x55 {
-                        self.buffer.remove(0);
+                let mut offset = 0;
+                while offset < self.buffer.len() {
+                    let buffer = &self.buffer[offset..];
+                    if buffer[0] != 0x55 {
+                        offset += 1;
                         continue;
                     }
-                    if self.buffer.len() < 8 {
+                    if buffer.len() < 8 {
                         break;
                     }
-                    let control = u16::from_le_bytes([self.buffer[1], self.buffer[2]]);
-                    let length = u16::from_le_bytes([self.buffer[5], self.buffer[6]]) as usize;
+                    let control = u16::from_le_bytes([buffer[1], buffer[2]]);
+                    let length = u16::from_le_bytes([buffer[5], buffer[6]]) as usize;
                     if length > 4096 || control & 0xff00 > 0x0100 {
-                        self.buffer.remove(0);
+                        offset += 1;
                         continue;
                     }
                     let end = 8 + length;
                     let total = end + if control & 0x20 != 0 { 2 } else { 0 };
-                    if self.buffer.len() < total {
+                    if buffer.len() < total {
                         break;
                     }
                     if control & 0x20 != 0
-                        && crc(&self.buffer[..end])
-                            != u16::from_le_bytes([self.buffer[end], self.buffer[end + 1]])
+                        && crc(&buffer[..end])
+                            != u16::from_le_bytes([buffer[end], buffer[end + 1]])
                     {
-                        self.buffer.remove(0);
+                        offset += 1;
                         continue;
                     }
-                    let command = u16::from_le_bytes([self.buffer[3], self.buffer[4]]) | 0x8000;
-                    let sequence = self.buffer[7];
-                    let payload = self.buffer[8..end].to_vec();
-                    self.buffer.drain(..total);
+                    let command = u16::from_le_bytes([buffer[3], buffer[4]]) | 0x8000;
+                    let sequence = buffer[7];
+                    let payload = buffer[8..end].to_vec();
+                    offset += total;
                     self.apply(command, &payload);
                     frames.push(json!({"command":command,"sequence":sequence,"payload":payload}));
                 }
+                self.buffer.drain(..offset);
                 Ok(json!({"frames":frames,"state":self.state}))
             }
             "read" | "write" | "packet" => {

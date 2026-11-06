@@ -28,7 +28,7 @@ inline const std::map<std::string, Command> reads{
     {"spatial", {0xC04F, {}}}, {"bass", {0xC04E, {}}},
     {"dual", {0xC027, {}}},    {"codec", {0xC029, {}}},
     {"firmware", {0xC042, {}}}};
-uint16_t crc16(const std::vector<uint8_t> &bytes, size_t length);
+uint16_t crc16(const std::vector<uint8_t> &bytes, size_t length, size_t offset = 0);
 std::vector<uint8_t> encode(const Command &command, uint8_t sequence);
 std::vector<Frame> decode(std::vector<uint8_t> &buffer);
 Json parse_frame(const Frame &frame);

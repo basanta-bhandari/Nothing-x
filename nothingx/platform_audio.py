@@ -44,6 +44,7 @@ class LinuxAudio(QObject):
         self.subscriber.setProcessEnvironment(self.environment())
         self.subscriber.readyReadStandardOutput.connect(self.changed)
         self.subscriber.finished.connect(lambda *_: self.reconnect())
+        self.subscriber.errorOccurred.connect(lambda error: self.reconnect() if error == QProcess.ProcessError.FailedToStart else None)
         self.retry = QTimer(self)
         self.retry.setSingleShot(True)
         self.retry.setInterval(4000)
@@ -73,9 +74,6 @@ class LinuxAudio(QObject):
         done = [False]
 
         def complete(code=-1, *_):
-            if self.closed:
-                self.processes.discard(process)
-                return
             if done[0]:
                 return
             done[0] = True
