@@ -26,6 +26,7 @@ jobs:
       - run: ./setup.sh
       - run: .venv/bin/python -m pip install -r requirements-build.txt
       - run: .venv/bin/python tests/test_beta.py -v
+      - run: .venv/bin/python tests/test_ui.py -v
       - run: .venv/bin/python packaging/build-macos.py
       - run: QT_QPA_PLATFORM=offscreen 'dist/macos/Nothing X.app/Contents/MacOS/nothingx' --demo --screenshot /tmp/nothingx-macos.png
       - name: Check native macOS desktop widget

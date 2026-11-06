@@ -14,6 +14,7 @@ from .themes import DEFAULT_THEME, THEMES, stylesheet, apply_palette
 from .components import DotLabel, palette
 from .preferences import preference_path, read_preferences, save_preferences
 from .models import MODELS, model_info
+from .connection_help import connection_hint
 from .discovery import Discovery
 from .widgets import ModeButton, Segments, Switch, ThemeSwatch, Slider
 from . import startup, __version__
@@ -272,6 +273,8 @@ class MainWindow(QMainWindow):
         more.setMenu(menu)
         heading.addWidget(more)
         content.addLayout(heading)
+        self.connection_tip = label(connection_hint(self.display_model), "banner", True)
+        content.addWidget(self.connection_tip)
         self.banner = label("", "banner", True)
         self.banner.hide()
         content.addWidget(self.banner)
@@ -722,15 +725,13 @@ class MainWindow(QMainWindow):
         self.connect_button.setText("Cancel" if phase == "connecting" else "Connect")
         self.connect_button.setVisible(phase not in ("connected", "demo"))
         self.disconnect_action.setEnabled(phase in ("connected", "connecting"))
-        if phase in ("connected", "demo"):
+        if phase in ("connected", "demo", "connecting"):
             self.banner.hide()
         elif phase == "disconnected":
             self.pending.clear()
             self.requested.clear()
             self.preset_queue.clear()
             self.preset_active = None
-            self.banner.setText("Turn on your headphones and connect them in Bluetooth settings before pressing Connect." if model_info(self.display_model)["kind"] in ("headphones", "neckband") else "Put both buds in the case and open the case before pressing Connect. It makes life easier.")
-            self.banner.show()
         self.render(self.state)
 
     def show_message(self, text, error=False):
@@ -748,6 +749,8 @@ class MainWindow(QMainWindow):
         shown = {**state, **self.requested}
         model = shown.get("model", self.display_model)
         profile = model_info(model)
+        self.connection_tip.setText(connection_hint(model))
+        self.connection_tip.setVisible(self.connection not in ("connected", "demo"))
         caps = set(profile.get("features", []))
         known = model in MODELS
         ready = self.connection in ("connected", "demo") and known

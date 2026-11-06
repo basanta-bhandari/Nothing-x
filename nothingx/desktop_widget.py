@@ -1,10 +1,12 @@
 import sys
 
 from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QGuiApplication
 from PySide6.QtWidgets import QWidget, QFrame, QLabel, QPushButton, QVBoxLayout, QHBoxLayout
 
 from .artwork import device_pixmap
 from .models import model_info
+from .connection_help import connection_hint
 from .widgets import Segments
 from .preferences import read_preferences, save_preferences
 
@@ -49,6 +51,10 @@ class DesktopWidget(QWidget):
         self.status = QLabel("Disconnected")
         self.status.setObjectName("muted")
         layout.addWidget(self.status)
+        self.connection_tip = QLabel(connection_hint(controller.display_model))
+        self.connection_tip.setWordWrap(True)
+        self.connection_tip.setObjectName("muted")
+        layout.addWidget(self.connection_tip)
         self.modes = Segments()
         self.modes.selected.connect(lambda mode: controller.change("anc", mode))
         layout.addWidget(self.modes)
@@ -75,6 +81,8 @@ class DesktopWidget(QWidget):
                 values.append(f"{names.get(key, key)} {data['level']}%{suffix}")
         self.battery.setText("   ".join(values) or "Battery unavailable")
         ready = phase in ("connected", "demo")
+        self.connection_tip.setText(connection_hint(model))
+        self.connection_tip.setVisible(not ready)
         self.status.setText({"connected": "Connected", "connecting": "Connecting…", "demo": "Demo"}.get(phase, "Disconnected"))
         modes = profile.get("anc_modes", [])
         strength = state.get("anc") if state.get("anc") not in ("Off", "Transparency") else next((v for v in ("Adaptive", "High", "Low") if v in modes), None)
@@ -92,7 +100,7 @@ class DesktopWidget(QWidget):
 
     def showEvent(self, event):
         super().showEvent(event)
-        if sys.platform == "darwin":
+        if sys.platform == "darwin" and QGuiApplication.platformName() == "cocoa":
             import ctypes
             import objc
             from AppKit import NSNormalWindowLevel, NSWindowCollectionBehaviorCanJoinAllSpaces, NSWindowCollectionBehaviorStationary, NSWindowCollectionBehaviorIgnoresCycle

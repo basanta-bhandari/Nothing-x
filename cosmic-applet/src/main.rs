@@ -18,6 +18,10 @@ use tokio::{
 
 const APP_ID: &str = "io.github.basanta_bhandari.NothingXApplet.Rust";
 const BACKEND: &str = "rust";
+static CONNECTION_HINTS: std::sync::LazyLock<Value> = std::sync::LazyLock::new(|| {
+    serde_json::from_str(include_str!("../../nothingx/assets/connection-hints.json"))
+        .expect("valid connection hints")
+});
 
 #[derive(Debug, Clone)]
 enum Message {
@@ -48,6 +52,7 @@ struct Applet {
     requested: BTreeMap<String, Value>,
     audio_tab: bool,
     opening_full: bool,
+    single_device: bool,
 }
 
 fn project_dir() -> PathBuf {
@@ -274,10 +279,7 @@ impl Applet {
         }
     }
     fn single_battery(&self) -> bool {
-        matches!(
-            self.state.pointer("/device/kind").and_then(Value::as_str),
-            Some("headphones" | "neckband")
-        )
+        self.single_device
     }
     fn battery_cell(&self, part: &str, title: &str) -> Element<'_, Message> {
         let detail = if self
@@ -530,6 +532,7 @@ impl cosmic::Application for Applet {
                 requested: BTreeMap::new(),
                 audio_tab: false,
                 opening_full: false,
+                single_device: false,
             },
             Task::none(),
         )
@@ -621,9 +624,12 @@ impl cosmic::Application for Applet {
         .spacing(6);
         let mut content = column![header, batteries].spacing(16).width(Length::Fill);
         if self.phase != "connected" && self.phase != "demo" {
-            content = content.push(connection);
+            let hint = CONNECTION_HINTS[if self.single_battery() { "headphones" } else { "earbuds" }]
+                .as_str()
+                .expect("connection hint text");
+            content = content.push(text::caption(hint)).push(connection);
         }
-        if !self.single_battery() && self.state.pointer("/battery/case/level").is_none() {
+        if matches!(self.phase.as_str(), "connected" | "demo") && !self.single_battery() && self.state.pointer("/battery/case/level").is_none() {
             content = content.push(text::caption("Open the case to refresh its battery."));
         }
         if !self.detail.is_empty() && self.detail != "Updated" && self.detail != "Connected" {
@@ -696,7 +702,10 @@ impl cosmic::Application for Applet {
             }
             Message::BridgeEvent(event) => match event["type"].as_str() {
                 Some("state") => {
-                    self.state = event.get("state").cloned().unwrap_or_else(|| json!({}))
+                    self.state = event.get("state").cloned().unwrap_or_else(|| json!({}));
+                    if let Some(kind) = self.state.pointer("/device/kind").and_then(Value::as_str) {
+                        self.single_device = matches!(kind, "headphones" | "neckband");
+                    }
                 }
                 Some("audio") => {
                     self.audio = event.get("state").cloned().unwrap_or_else(|| json!({}))

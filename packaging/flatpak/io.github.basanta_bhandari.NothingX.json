@@ -31,7 +31,8 @@
       "install -Dm644 packaging/flatpak/io.github.basanta_bhandari.NothingX.desktop /app/share/applications/io.github.basanta_bhandari.NothingX.desktop",
       "install -Dm644 packaging/flatpak/io.github.basanta_bhandari.NothingX.metainfo.xml /app/share/metainfo/io.github.basanta_bhandari.NothingX.metainfo.xml",
       "install -Dm644 nothingx/assets/cmf-buds-pro-2/blue_case.png /app/share/icons/hicolor/512x512/apps/io.github.basanta_bhandari.NothingX.png",
-      "QT_QPA_PLATFORM=offscreen NOTHINGX_PREFERENCES=/tmp/nothingx-build-check/preferences.json /app/bin/nothingx --demo --screenshot /tmp/nothingx-build-check.png"
+      "QT_QPA_PLATFORM=offscreen NOTHINGX_PREFERENCES=/tmp/nothingx-build-check/preferences.json /app/bin/nothingx --demo --screenshot /tmp/nothingx-build-check.png",
+      "QT_QPA_PLATFORM=offscreen PYTHONPATH=/app/lib/nothingx:/app/lib/nothingx-deps QT_PLUGIN_PATH=/app/lib/nothingx-deps/PySide6/Qt/plugins NOTHINGX_ENGINE=/app/lib/nothingx/nothingx/bin/libnothingx_rust.so python3 tests/test_ui.py -v"
     ],
     "sources": [{"type": "dir", "path": "../../build/flatpak-source"}]
   }]

@@ -12,7 +12,7 @@ parser.add_argument("--prepare-only", action="store_true")
 args = parser.parse_args()
 stage = root / "build/flatpak-source"
 stage.mkdir(parents=True, exist_ok=True)
-for directory in ("nothingx", "rust-engine", "packaging", "licenses"):
+for directory in ("nothingx", "rust-engine", "packaging", "licenses", "tests"):
     target = stage / directory
     if target.exists():
         shutil.rmtree(target)
