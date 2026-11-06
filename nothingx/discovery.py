@@ -135,7 +135,10 @@ class Discovery(QObject):
                 result = asyncio.run(asyncio.wait_for(scan(), 5))
             except Exception as error:
                 result = [], set(), str(error)
-            self.bus_result.emit(result)
+            try:
+                self.bus_result.emit(result)
+            except RuntimeError:
+                pass
         threading.Thread(target=run, daemon=True).start()
 
     def deliver_bus_devices(self, result):

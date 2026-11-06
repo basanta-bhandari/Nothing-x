@@ -108,7 +108,7 @@ class Updater(QObject):
         self.release = release
         if os.environ.get("FLATPAK_ID"):
             self.busy = False
-            self.status.emit("Version " + release["tag_name"] + " available. Update Nothing X in your software manager.")
+            self.status.emit("Version " + release["tag_name"] + " available. Update through your software manager or install the newer Flatpak bundle.")
             self.artifact = {"managed": True}
             self.available.emit(True)
             return
@@ -185,7 +185,6 @@ class Updater(QObject):
         reply.finished.connect(finished)
 
     def prepare_install(self, artifact):
-        info = build_info()
         variant = variant_id()
         backend, distribution = variant.split("-", 1)
         root = Path(__file__).resolve().parents[1]

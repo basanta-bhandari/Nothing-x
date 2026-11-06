@@ -75,12 +75,13 @@ def request_flatpak_startup(value, callback, parent):
             path = "/org/freedesktop/portal/desktop/request/" + bus.unique_name[1:].replace(".", "_") + "/" + token
             def received(message):
                 if message.path == path and message.interface == "org.freedesktop.portal.Request" and message.member == "Response" and not response.done():
-                    response.set_result(message.body[0])
+                    response.set_result(message.body)
             bus.add_message_handler(received)
             reply = await bus.call(Message(destination="org.freedesktop.portal.Desktop", path="/org/freedesktop/portal/desktop", interface="org.freedesktop.portal.Background", member="RequestBackground", signature="sa{sv}", body=["", {"handle_token": Variant("s", token), "reason": Variant("s", "Keep Nothing X device controls available and open at startup."), "autostart": Variant("b", bool(value)), "commandline": Variant("as", ["nothingx", "--connect"])}]))
             if reply.message_type == MessageType.ERROR:
                 raise OSError("Your desktop could not change startup permission.")
-            if await response != 0:
+            code, result = await response
+            if code != 0 or (value and not result.get("autostart", False)):
                 raise OSError("Startup permission was not granted.")
         finally:
             bus.disconnect()

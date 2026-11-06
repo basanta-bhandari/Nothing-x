@@ -39,6 +39,12 @@ artifacts = []
 for path in sorted(args.output.iterdir()):
     if path.suffix not in (".dmg", ".flatpak", ".gz"):
         continue
+    if path.suffix == ".gz" and "-rust-applet-" not in path.name:
+        continue
+    if path.suffix == ".dmg" and not path.name.startswith("NothingX-macos-"):
+        continue
+    if path.suffix == ".flatpak" and not path.name.startswith("NothingX-linux-"):
+        continue
     with path.open("rb") as file:
         digest = hashlib.file_digest(file, "sha256").hexdigest()
     base = {"file": path.name, "sha256": digest, "size": path.stat().st_size}
