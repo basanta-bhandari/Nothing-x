@@ -36,19 +36,23 @@ for backend in ("rust",):
             archive.add(binary, "NothingX/cosmic-applet/bin/" + binary.name)
             archive.add(library, "NothingX/nothingx/bin/" + library.name)
 artifacts = []
+checksums = []
 for path in sorted(args.output.iterdir()):
-    if path.suffix not in (".dmg", ".flatpak", ".gz"):
+    if path.suffix not in (".dmg", ".flatpak", ".gz", ".zip"):
         continue
-    if path.suffix == ".gz" and "-rust-applet-" not in path.name:
+    if path.suffix == ".gz" and "-rust-applet-" not in path.name and path.name != source.name:
         continue
     if path.suffix == ".dmg" and not path.name.startswith("NothingX-macos-"):
         continue
     if path.suffix == ".flatpak" and not path.name.startswith("NothingX-linux-"):
         continue
+    if path.suffix == ".zip" and not (path.name.startswith("NothingX-macos-") and path.name.endswith(".app.zip")):
+        continue
     with path.open("rb") as file:
         digest = hashlib.file_digest(file, "sha256").hexdigest()
     base = {"file": path.name, "sha256": digest, "size": path.stat().st_size}
-    if "-source-" in path.name:
+    checksums.append(base)
+    if path.name == source.name or path.suffix == ".zip":
         continue
     backend = "rust"
     distribution = "flatpak" if path.suffix == ".flatpak" else "applet" if "-applet-" in path.name else "macos"
@@ -57,5 +61,5 @@ for path in sorted(args.output.iterdir()):
     artifacts.append({**base, "variant": backend + "-" + distribution, "os": system, "arch": architecture})
 manifest = {"schema": 2, "version": __version__, "commit": commit, "artifacts": artifacts}
 (args.output / "nothingx-update.json").write_text(json.dumps(manifest, indent=2) + "\n")
-(args.output / "SHA256SUMS").write_text("".join(f"{item['sha256']}  {item['file']}\n" for item in {item["file"]: item for item in artifacts}.values()))
+(args.output / "SHA256SUMS").write_text("".join(f"{item['sha256']}  {item['file']}\n" for item in checksums))
 print(args.output / "nothingx-update.json")

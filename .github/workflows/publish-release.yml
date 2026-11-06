@@ -1,0 +1,33 @@
+name: Publish verified release
+on:
+  workflow_dispatch:
+    inputs:
+      macos_run:
+        description: Successful run containing both native-widget-tested Mac packages
+        required: true
+        default: '42180090921'
+      flatpak_run:
+        description: Successful run containing the Flatpak package
+        required: true
+        default: '42179619394'
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: publish-release
+  cancel-in-progress: false
+jobs:
+  publish:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - run: python tests/test_publish_release.py -v
+      - name: Assemble and verify packages, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          MACOS_RUN: ${{ inputs.macos_run }}
+          FLATPAK_RUN: ${{ inputs.flatpak_run }}
+        run: python tools/publish_release.py --macos-run "$MACOS_RUN" --flatpak-run "$FLATPAK_RUN"

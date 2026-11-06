@@ -51,7 +51,7 @@ The [browser demo](https://basanta.cc/nothing-x/) runs entirely with simulated d
 
 </details>
 
-The screenshots show the 0.5 desktop preview using simulated data. The published packages currently represent the earlier public release.
+The screenshots show the 0.5 desktop preview using simulated data. The 0.6 packages retain this shared layout.
 
 ## Why it exists
 
@@ -63,16 +63,16 @@ One Rust engine and one shared Python/Cython UI, packaged for three targets:
 
 | Version | Platform | Desktop integration |
 | --- | --- | --- |
-| Flatpak | Fedora, Debian, Ubuntu, RHEL-family and other Flatpak-capable Linux distributions | Desktop widget, tray and PipeWire controls |
-| COSMIC applet | CachyOS/COSMIC and other COSMIC installations | Native panel applet, full settings and desktop widget |
-| macOS app | macOS | `Nothing X.app`, menu bar, CoreAudio and desktop widget |
+| [Flatpak](https://github.com/basanta-bhandari/Nothing-x/releases/latest/download/NothingX-linux-x86_64.flatpak) | Fedora, Debian, Ubuntu, RHEL-family and other Flatpak-capable Linux distributions | Desktop widget, tray and PipeWire controls |
+| [COSMIC applet](https://github.com/basanta-bhandari/Nothing-x/releases/latest/download/NothingX-rust-applet-linux-x86_64.tar.gz) | CachyOS/COSMIC and other COSMIC installations | Native panel applet, full settings and desktop widget |
+| [macOS app](https://github.com/basanta-bhandari/Nothing-x/releases/latest) | macOS | Apple Silicon and Intel `.app`/`.dmg`, menu bar, CoreAudio and desktop widget |
 
 Enable **Settings → App → Show desktop widget** in any version. The widget shares the app's device connection, battery data and theme. It stays available when the main window is hidden; quitting the app closes it.
 
-The 0.6 packaging replaces the C++ and AppImage variants. Earlier release assets remain historical builds. Flatpak is not yet on Flathub; build the bundle below, then install:
+The 0.6 packaging replaces the C++ and AppImage variants. Earlier release assets remain historical builds. Flatpak is distributed as a GitHub release bundle and is not yet on Flathub. Download the bundle, then install:
 
 ```bash
-flatpak install --user ./dist/NothingX-linux-x86_64.flatpak
+flatpak install --user ./NothingX-linux-x86_64.flatpak
 flatpak run io.github.basanta_bhandari.NothingX
 ```
 
