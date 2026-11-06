@@ -50,6 +50,8 @@ metadata.write_text(f"""<?xml version="1.0" encoding="UTF-8"?>
   <content_rating type="oars-1.1"/>
 </component>
 """)
+from tools.migrate_legacy import migrate
+migrate(prefix, Path(os.environ.get("XDG_CONFIG_HOME", Path.home() / ".config")))
 if shutil.which("update-desktop-database"):
     subprocess.run(["update-desktop-database", str(desktop.parent)], check=False, capture_output=True)
 print(f"Installed {label} applet and searchable full settings. Add Nothing X ({label}) in COSMIC Settings → Desktop → Panel → Applets.")

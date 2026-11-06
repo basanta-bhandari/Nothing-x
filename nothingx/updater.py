@@ -101,9 +101,10 @@ class Updater(QObject):
         if release.get("draft") or release.get("prerelease"):
             raise ValueError("No stable release is available.")
         version = version_number(release.get("tag_name"))
-        if version <= version_number(__version__):
+        installed = version_number(__version__)
+        if version <= installed:
             self.busy = False
-            self.status.emit("You’re up to date · " + __version__)
+            self.status.emit(("No newer published release · " if version == installed else "Installed " + __version__ + " · latest published release ") + release["tag_name"])
             return
         self.release = release
         if os.environ.get("FLATPAK_ID"):
