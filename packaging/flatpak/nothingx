@@ -1,0 +1,6 @@
+#!/bin/sh
+export NOTHINGX_BACKEND=rust
+export NOTHINGX_DISTRIBUTION=flatpak
+export PYTHONPATH=/app/lib/nothingx:/app/lib/nothingx-deps
+export QT_PLUGIN_PATH=/app/lib/nothingx-deps/PySide6/Qt/plugins
+exec python3 -m nothingx "$@"

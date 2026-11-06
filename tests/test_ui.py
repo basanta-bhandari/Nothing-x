@@ -35,6 +35,7 @@ class InterfaceChecks(unittest.TestCase):
         self.audio.start()
         self.addCleanup(self.audio.stop)
         self.window = MainWindow(demo=True)
+        self.addCleanup(self.window.desktop_widget.deleteLater)
         self.addCleanup(self.window.backend_client.stop)
         self.addCleanup(self.window.deleteLater)
         self.window.show()
@@ -66,6 +67,23 @@ class InterfaceChecks(unittest.TestCase):
         self.assertFalse(self.window.requested)
         self.assertIsNone(self.window.preset_active)
         self.assertIn("Put both buds", self.window.banner.text())
+
+    def test_widget_shares_device_state_and_theme(self):
+        self.window.set_widget_enabled(True)
+        widget = self.window.desktop_widget
+        self.assertTrue(widget.isVisible())
+        self.assertIn("CMF", widget.name.text())
+        self.assertIn("%", widget.battery.text())
+        self.window.apply_theme("porcelain")
+        self.assertFalse(widget.grab().isNull())
+        widget.close()
+        self.assertFalse(self.window.widget_toggle.isChecked())
+
+    def test_widget_dismissal_restores_hidden_settings(self):
+        self.window.set_widget_enabled(True)
+        self.window.hide()
+        self.window.desktop_widget.close()
+        self.assertTrue(self.window.isVisible())
 
 
 if __name__ == "__main__":

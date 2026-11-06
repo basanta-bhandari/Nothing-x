@@ -12,3 +12,4 @@ target/
 *.so
 *.dylib
 PROMOTION_DRAFTS.md
+.flatpak-builder/

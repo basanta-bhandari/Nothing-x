@@ -4,10 +4,10 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nothingx-linux"
-version = "0.5.0"
+version = "0.6.0"
 description = "Nothing and CMF audio controls for Linux and macOS"
 requires-python = ">=3.11"
-dependencies = ["PySide6-Essentials>=6.6,<7", "PySide6-Addons>=6.6,<7", "pyobjc-framework-IOBluetooth>=10; sys_platform == 'darwin'"]
+dependencies = ["PySide6-Essentials>=6.6,<7", "PySide6-Addons>=6.6,<7", "pyobjc-framework-IOBluetooth>=10; sys_platform == 'darwin'", "dbus-next==0.2.3; sys_platform == 'linux'"]
 license = "MIT"
 
 [project.scripts]

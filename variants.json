@@ -1,39 +1,18 @@
 {
-  "schema": 1,
+  "schema": 2,
+  "backend": "rust",
   "variants": [
     {
-      "id": "cpp-portable",
-      "backend": "cpp",
-      "distribution": "portable",
-      "platforms": [
-        "linux",
-        "macos"
-      ]
-    },
-    {
-      "id": "cpp-applet",
-      "backend": "cpp",
-      "distribution": "applet",
-      "platforms": [
-        "linux-cosmic"
-      ]
-    },
-    {
-      "id": "cpp-manual",
-      "backend": "cpp",
-      "distribution": "manual",
-      "platforms": [
-        "linux",
-        "macos"
-      ]
-    },
-    {
-      "id": "rust-portable",
+      "id": "rust-flatpak",
       "backend": "rust",
-      "distribution": "portable",
+      "distribution": "flatpak",
       "platforms": [
-        "linux",
-        "macos"
+        "linux"
+      ],
+      "features": [
+        "desktop-widget",
+        "pipewire",
+        "flatpak-updates"
       ]
     },
     {
@@ -42,15 +21,24 @@
       "distribution": "applet",
       "platforms": [
         "linux-cosmic"
+      ],
+      "features": [
+        "desktop-widget",
+        "pipewire",
+        "cosmic-panel"
       ]
     },
     {
-      "id": "rust-manual",
+      "id": "rust-macos",
       "backend": "rust",
-      "distribution": "manual",
+      "distribution": "macos",
       "platforms": [
-        "linux",
         "macos"
+      ],
+      "features": [
+        "desktop-widget",
+        "coreaudio",
+        "menu-bar"
       ]
     }
   ]

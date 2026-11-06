@@ -167,6 +167,10 @@ class MainWindow(QMainWindow):
         self.apply_theme(self.theme_name, persist=False)
         self._build()
         self._tray()
+        from .desktop_widget import DesktopWidget
+        self.desktop_widget = DesktopWidget(self)
+        self.desktop_widget.dismissed.connect(self.widget_dismissed)
+        self.desktop_widget.setVisible(bool(preferences.get("desktop_widget", False)))
         self.refresh_timer = QTimer(self)
         self.refresh_timer.setInterval(30000)
         self.refresh_timer.timeout.connect(lambda: self.refresh() if self.isVisible() else None)
@@ -535,6 +539,10 @@ class MainWindow(QMainWindow):
         app_box = QVBoxLayout(app_page)
         app_box.setContentsMargins(0, 0, 0, 0)
         preferences, p = card("App preferences")
+        self.widget_toggle = Switch("Show desktop widget")
+        self.widget_toggle.setChecked(read_preferences().get("desktop_widget", False))
+        self.widget_toggle.clicked.connect(self.set_widget_enabled)
+        p.addWidget(self.widget_toggle)
         self.startup_toggle = Switch("Open at startup")
         self.startup_toggle.setChecked(startup.enabled())
         self.startup_toggle.clicked.connect(self.change_startup)
@@ -735,6 +743,8 @@ class MainWindow(QMainWindow):
 
     def render(self, state):
         self.state = state
+        if hasattr(self, "desktop_widget"):
+            self.desktop_widget.render(state, self.connection)
         shown = {**state, **self.requested}
         model = shown.get("model", self.display_model)
         profile = model_info(model)
@@ -916,13 +926,36 @@ class MainWindow(QMainWindow):
         self.product_color = self.color_select.itemData(index)
         save_preferences(product_color=self.product_color)
         self.product_art.set_color(self.product_color)
+        self.desktop_widget.render(self.state, self.connection)
 
     def change_startup(self, enabled):
+        import os
+        if os.environ.get("FLATPAK_ID"):
+            self.startup_toggle.setEnabled(False)
+            def completed(value, error):
+                save_preferences(startup_enabled=value)
+                self.startup_toggle.setChecked(value)
+                self.startup_toggle.setEnabled(True)
+                if error:
+                    self.show_message(error, True)
+            self.startup_request = startup.request_flatpak_startup(enabled, completed, self)
+            return
         try:
             startup.set_enabled(enabled)
         except OSError as error:
             self.startup_toggle.setChecked(startup.enabled())
             self.show_message(str(error), True)
+
+    def set_widget_enabled(self, enabled):
+        save_preferences(desktop_widget=bool(enabled))
+        self.widget_toggle.setChecked(bool(enabled))
+        self.desktop_widget.setVisible(bool(enabled))
+        self.desktop_widget.render(self.state, self.connection)
+
+    def widget_dismissed(self):
+        self.set_widget_enabled(False)
+        if not self.isVisible():
+            self.restore()
 
     def change_codec(self, *_):
         value = self.codec_select.currentData()
@@ -968,7 +1001,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event):
         self.settings.setValue("tray", self.minimize_tray.isChecked())
         self.settings.setValue("channel", self.channel.value())
-        if self.tray and self.minimize_tray.isChecked() and not self._closing:
+        if not self._closing and ((self.tray and self.minimize_tray.isChecked()) or self.desktop_widget.isVisible()):
             self.hide()
             event.ignore()
             return
@@ -977,6 +1010,8 @@ class MainWindow(QMainWindow):
         self.theme_timer.stop()
         self.bass_timer.stop()
         self.updater.close()
+        self.desktop_widget.hide()
+        self.desktop_widget.deleteLater()
         self.worker.stop()
         if self.tray:
             self.tray.hide()

@@ -1,6 +1,6 @@
 # Nothing X
 
-Desktop controls for Nothing and CMF audio devices on Linux, including a native COSMIC panel applet.
+Desktop controls for Nothing and CMF audio devices on Linux and macOS, with a desktop widget and native COSMIC panel applet.
 
 [Try the interactive demo](https://basanta.cc/nothing-x/) · [Download the latest release](https://github.com/basanta-bhandari/Nothing-x/releases/latest)
 
@@ -14,7 +14,7 @@ Nothing X is an unofficial desktop companion for the controls that usually live 
 - View left, right, and case battery readings; case values stay visible as **Last reported** when the case is unavailable.
 - Manage Bluetooth profiles, output volume and balance, microphones, and per-application routing through PipeWire.
 - Save sound presets, choose from six themes, enable startup, and check for an update that matches the installed variant.
-- Keep essential device controls and battery information in a compact COSMIC panel applet.
+- Keep essential device controls and battery information in a desktop widget or COSMIC panel applet.
 
 Feature availability depends on the connected model and its firmware. CMF Buds Pro 2 is the primary development device; other model profiles remain hardware-dependent.
 
@@ -59,72 +59,58 @@ Nothing and CMF devices expose useful controls through their phone companion app
 
 ## Choose a build
 
-The same UI is available with two native backends and three distribution methods: six variants in total.
+One Rust engine and one shared Python/Cython UI, packaged for three targets:
 
-| Distribution | C++ + Python/Cython | Rust + Python/Cython |
+| Version | Platform | Desktop integration |
 | --- | --- | --- |
-| Portable Linux app | [C++ AppImage](https://github.com/basanta-bhandari/Nothing-x/releases/latest/download/NothingX-cpp-x86_64.AppImage) | [Rust AppImage](https://github.com/basanta-bhandari/Nothing-x/releases/latest/download/NothingX-rust-x86_64.AppImage) |
-| COSMIC panel applet | `--backend cpp` | `--backend rust` |
-| Clone and run | `./run-cpp.sh` | `./run-rust.sh` |
+| Flatpak | Fedora, Debian, Ubuntu, RHEL-family and other Flatpak-capable Linux distributions | Desktop widget, tray and PipeWire controls |
+| COSMIC applet | CachyOS/COSMIC and other COSMIC installations | Native panel applet, full settings and desktop widget |
+| macOS app | macOS | `Nothing X.app`, menu bar, CoreAudio and desktop widget |
 
-Published AppImages target Linux x86-64 and are built on CachyOS. To run one, make it executable and launch it:
+Enable **Settings → App → Show desktop widget** in any version. The widget shares the app's device connection, battery data and theme. It stays available when the main window is hidden; quitting the app closes it.
+
+The 0.6 packaging replaces the C++ and AppImage variants. Earlier release assets remain historical builds. Flatpak is not yet on Flathub; build the bundle below, then install:
 
 ```bash
-chmod +x NothingX-cpp-x86_64.AppImage
-./NothingX-cpp-x86_64.AppImage
+flatpak install --user ./dist/NothingX-linux-x86_64.flatpak
+flatpak run io.github.basanta_bhandari.NothingX
 ```
 
-macOS `.app` and `.dmg` build scripts are included, although prebuilt Mac packages and hardware validation are still pending.
+Flatpak repository installations update through your software manager or `flatpak update`. Standalone bundles need the newer bundle installed. Linux audio controls require PipeWire's PulseAudio service; system-wide WirePlumber policy controls appear only when available.
 
 ## Run from source
 
-On CachyOS or Arch Linux:
+Install Python 3.11+, [Rust](https://www.rust-lang.org/tools/install) 1.85+ and a C compiler for optional Cython extensions. Pair your device in system Bluetooth settings first.
 
 ```bash
-sudo pacman -S --needed git python python-pip base-devel cmake pkgconf json-c bluez bluez-utils pipewire-pulse wireplumber
-sudo systemctl enable --now bluetooth
-
 git clone https://github.com/basanta-bhandari/Nothing-x.git
 cd Nothing-x
-./setup.sh --backend cpp
-./run-cpp.sh
+./setup.sh
+./run.sh
+./run.sh --demo
 ```
 
-`setup.sh` creates `.venv`, installs Python requirements, and builds the selected engine. Pair the device in system Bluetooth settings before opening the app.
+Source setup is a development workflow, not a fourth distribution. On Linux, paired-device listing outside Flatpak needs BlueZ's `bluetoothctl`.
 
-For Rust, install [Rust](https://www.rust-lang.org/tools/install) 1.85 or newer, then use `./setup.sh --backend rust` and `./run-rust.sh`. Use `--backend all` to build both engines.
-
-Run the desktop UI with simulated data:
+Build and install the COSMIC applet with Rust 1.93+ and the libcosmic build dependencies:
 
 ```bash
-./run-cpp.sh --demo
+.venv/bin/python tools/build_applets.py
+.venv/bin/python install-cosmic.py
 ```
 
-Install a searchable desktop entry:
-
-```bash
-.venv/bin/python install-local.py --backend cpp
-```
-
-Build and install the current COSMIC applet with Rust 1.93 or newer:
-
-```bash
-.venv/bin/python tools/build_applets.py --backend cpp
-.venv/bin/python install-cosmic.py --backend cpp
-```
-
-Replace `cpp` with `rust` for the other backend, then add **Nothing X** in COSMIC Settings → Desktop → Panel → Applets.
+Add **Nothing X (Rust)** in COSMIC Settings → Desktop → Panel → Applets.
 
 ## How it is built
 
 | Layer | Technology |
 | --- | --- |
 | Desktop interface | [Python](https://www.python.org/) 3.11+, [PySide6 / Qt Widgets](https://doc.qt.io/qtforpython-6/), and [Cython](https://cython.org/) |
-| Device engines | C++20 with [json-c](https://github.com/json-c/json-c), or Rust |
+| Device engine | Rust |
 | Bluetooth | [BlueZ](https://www.bluez.org/), nonblocking RFCOMM sockets, and the Qt event loop |
 | Audio | [PipeWire](https://pipewire.org/), its PulseAudio interface, and [WirePlumber](https://pipewire.pages.freedesktop.org/wireplumber/) |
 | COSMIC applet | Rust and [libcosmic](https://github.com/pop-os/libcosmic) |
-| Packaging | [CMake](https://cmake.org/), Cargo, Cython, and [PyInstaller](https://pyinstaller.org/) |
+| Packaging | Cargo, Flatpak, Cython, and [PyInstaller](https://pyinstaller.org/) |
 
 The window and panel applet share a local service. That service owns device communication and state while the UI renders controls and receives updates. This keeps a single device connection alive even when the full window and applet are both open.
 
@@ -142,7 +128,7 @@ The main engineering work focused on making a desktop-first experience feel cohe
 For Python-only UI iteration, use:
 
 ```bash
-./setup.sh --backend cpp --no-cython
+./setup.sh --no-cython
 ```
 
 After editing compiled UI modules, rebuild them with:
@@ -151,15 +137,14 @@ After editing compiled UI modules, rebuild them with:
 .venv/bin/python setup.py build_ext --inplace
 ```
 
-Rebuild an engine with `.venv/bin/python tools/build_backends.py --backend cpp` or `rust`.
+Rebuild the Rust engine with `.venv/bin/python tools/build_backends.py`.
 
-Run the device-service regression checks against each built engine:
+Run the device-service and shared-UI regression checks:
 
 ```bash
-NOTHINGX_BACKEND=cpp .venv/bin/python tests/test_beta.py -v
 NOTHINGX_BACKEND=rust .venv/bin/python tests/test_beta.py -v
-NOTHINGX_BACKEND=cpp .venv/bin/python tests/test_ui.py -v
 NOTHINGX_BACKEND=rust .venv/bin/python tests/test_ui.py -v
+.venv/bin/python tests/test_distributions.py -v
 ```
 
 These checks use simulated transports and cover fragmented responses, request ordering, timeouts, reconnect queues, locator deadlines, and every model profile. They do not connect to physical devices. Hardware testing is still needed for firmware-specific behavior and macOS.
@@ -167,21 +152,25 @@ These checks use simulated transports and cover fragmented responses, request or
 Key directories:
 
 - [`nothingx/`](nothingx/) — UI, audio integration, and local service
-- [`native/`](native/) — C++ engine
 - [`rust-engine/`](rust-engine/) — Rust engine
 - [`cosmic-applet/`](cosmic-applet/) — COSMIC panel applet
 
-For an AppImage, install [appimagetool](https://github.com/AppImage/appimagetool), then run:
+For Flatpak, install `flatpak-builder` (or `org.flatpak.Builder`) and configure Flathub, then run:
 
 ```bash
+.venv/bin/python packaging/build-flatpak.py
+```
+
+The build vendors locked Cargo dependencies and downloads pinned Python wheels before an offline sandbox build. Output: `dist/NothingX-linux-<architecture>.flatpak`.
+
+On a Mac:
+
+```bash
+./setup.sh
 .venv/bin/python -m pip install -r requirements-build.txt
-packaging/build-appimage.sh cpp
+.venv/bin/python packaging/build-macos.py
 ```
 
-On macOS, install Python, CMake, pkg-config, json-c, and Rust, for example with [Homebrew](https://brew.sh/). Run the same setup command, then build a disk image with:
-
-```bash
-.venv/bin/python packaging/build-macos.py --backend cpp
-```
+Outputs: `dist/macos/Nothing X.app` and an architecture-specific `.dmg`. The **Rust packages** GitHub Actions workflow also builds macOS packages and the Linux Flatpak. Mac packages use ad-hoc signing unless `NOTHINGX_CODESIGN_IDENTITY` is set; notarization and physical-device validation remain separate release checks.
 
 Licensed under [MIT](LICENSE). See [NOTICE](NOTICE) for assets and dependencies. Nothing X is not affiliated with Nothing or CMF.

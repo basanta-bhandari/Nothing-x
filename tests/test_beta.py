@@ -51,7 +51,7 @@ class ServiceChecks(unittest.TestCase):
     def setUp(self):
         self.audio = patch("nothingx.service.make_audio", lambda parent: AudioStub(parent))
         self.audio.start()
-        self.service = Service(os.environ.get("NOTHINGX_BACKEND", "cpp"))
+        self.service = Service("rust")
         self.addCleanup(self.audio.stop)
         self.addCleanup(self.service.close)
 

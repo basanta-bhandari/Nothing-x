@@ -17,7 +17,7 @@ def main():
     parser.add_argument("--page", choices=("overview", "sound", "audio", "device"), default="overview")
     parser.add_argument("--screenshot", type=Path, help="Save a demo preview and exit (implies --demo)")
     from .variants import backend_name
-    parser.add_argument("--backend", choices=("cpp", "rust"), default=backend_name())
+    parser.add_argument("--backend", choices=("rust",), default=backend_name())
     from .models import MODELS
     parser.add_argument("--demo-model", choices=tuple(MODELS), default="B172")
     from .themes import THEMES

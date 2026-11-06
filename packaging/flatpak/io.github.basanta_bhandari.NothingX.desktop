@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=Nothing X
+Comment=Nothing and CMF audio controls
+Exec=nothingx
+Icon=io.github.basanta_bhandari.NothingX
+Terminal=false
+Categories=AudioVideo;Audio;Settings;
+Keywords=Nothing;CMF;Buds;Headphones;Bluetooth;
+StartupNotify=true

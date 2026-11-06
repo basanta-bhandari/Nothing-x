@@ -8,9 +8,9 @@ import sys
 
 root = Path(__file__).resolve().parents[1]
 parser = argparse.ArgumentParser()
-parser.add_argument("--backend", choices=("cpp", "rust"), required=True)
+parser.add_argument("--backend", choices=("rust",), default="rust")
 parser.add_argument("--output", type=Path, required=True)
-parser.add_argument("--distribution", choices=("portable", "manual"), default="portable")
+parser.add_argument("--distribution", choices=("macos",), default="macos")
 args = parser.parse_args()
 backend = args.backend
 build = root / "build/freeze" / backend
@@ -20,7 +20,7 @@ if assets.exists():
 shutil.copytree(root / "nothingx/assets", assets, ignore=shutil.ignore_patterns("build.json"))
 sys.path.insert(0, str(root))
 from nothingx import __version__
-(assets / "build.json").write_text(json.dumps({"backend": backend, "distribution": args.distribution, "version": __version__, **({"source": str(root)} if args.distribution == "manual" else {})}) + "\n")
+(assets / "build.json").write_text(json.dumps({"backend": backend, "distribution": args.distribution, "version": __version__, "managed": False}) + "\n")
 entry = build / "entry.py"
 entry.write_text(f'import os\nos.environ["NOTHINGX_BACKEND"] = "{backend}"\nos.environ["NOTHINGX_DISTRIBUTION"] = "{args.distribution}"\nfrom nothingx.__main__ import main\nraise SystemExit(main())\n')
 suffix = "dylib" if sys.platform == "darwin" else "so"
@@ -34,7 +34,7 @@ command += ["--add-binary", f"{library}:nothingx/bin", "--add-data", f"{assets}:
 for name in ("LICENSE", "NOTICE", "licenses"):
     command += ["--add-data", f"{root / name}:{'licenses' if name == 'licenses' else '.'}"]
 if sys.platform == "darwin":
-    command += ["--windowed", "--osx-bundle-identifier", f"io.github.basanta_bhandari.NothingX.{backend}", "--hidden-import", "IOBluetooth", "--hidden-import", "Foundation"]
+    command += ["--windowed", "--osx-bundle-identifier", "io.github.basanta_bhandari.NothingX", "--hidden-import", "IOBluetooth", "--hidden-import", "Foundation", "--hidden-import", "AppKit", "--hidden-import", "objc"]
     icon = root / "build/icons/NothingX.icns"
     if icon.is_file():
         command += ["--icon", str(icon)]

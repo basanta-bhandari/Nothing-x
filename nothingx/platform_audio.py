@@ -2,6 +2,7 @@ import json
 import re
 import os
 import sys
+import shutil
 
 from PySide6.QtCore import QObject, QProcess, QProcessEnvironment, QTimer, Signal
 
@@ -95,7 +96,8 @@ class LinuxAudio(QObject):
             return
         if self.subscriber.state() == QProcess.ProcessState.NotRunning:
             self.subscriber.start("pactl", ["subscribe"])
-        self.run("wpctl", ["settings", "bluetooth.autoswitch-to-headset-profile"], self.headset_read)
+        if shutil.which("wpctl"):
+            self.run("wpctl", ["settings", "bluetooth.autoswitch-to-headset-profile"], self.headset_read)
         self.refresh()
 
     def headset_read(self, output, error):

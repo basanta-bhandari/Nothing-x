@@ -16,15 +16,8 @@ use tokio::{
     sync::mpsc,
 };
 
-#[cfg(not(feature = "rust-backend"))]
-const APP_ID: &str = "io.github.basanta_bhandari.NothingXApplet.Cpp";
-#[cfg(feature = "rust-backend")]
 const APP_ID: &str = "io.github.basanta_bhandari.NothingXApplet.Rust";
-const BACKEND: &str = if cfg!(feature = "rust-backend") {
-    "rust"
-} else {
-    "cpp"
-};
+const BACKEND: &str = "rust";
 
 #[derive(Debug, Clone)]
 enum Message {

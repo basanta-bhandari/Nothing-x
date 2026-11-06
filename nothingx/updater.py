@@ -63,7 +63,7 @@ class Updater(QObject):
     def fetch_json(self, url, callback):
         request = QNetworkRequest(QUrl(url))
         request.setRawHeader(b"Accept", b"application/vnd.github+json")
-        request.setRawHeader(b"User-Agent", b"NothingX/0.4.0")
+        request.setRawHeader(b"User-Agent", ("NothingX/" + __version__).encode())
         request.setTransferTimeout(20000)
         reply = self.network.get(request)
         self.reply = reply
@@ -106,6 +106,12 @@ class Updater(QObject):
             self.status.emit("You’re up to date · " + __version__)
             return
         self.release = release
+        if os.environ.get("FLATPAK_ID"):
+            self.busy = False
+            self.status.emit("Version " + release["tag_name"] + " available. Update Nothing X in your software manager.")
+            self.artifact = {"managed": True}
+            self.available.emit(True)
+            return
         asset = next((item for item in release.get("assets", []) if item.get("name") == "nothingx-update.json"), {})
         url = asset.get("browser_download_url", "")
         if not release_url(url):
@@ -131,6 +137,10 @@ class Updater(QObject):
         self.available.emit(True)
 
     def install(self):
+        if os.environ.get("FLATPAK_ID"):
+            from PySide6.QtGui import QDesktopServices
+            QDesktopServices.openUrl(QUrl("appstream://" + os.environ["FLATPAK_ID"]))
+            return
         if self.busy or not self.artifact:
             return
         self.busy = True
@@ -179,21 +189,17 @@ class Updater(QObject):
         variant = variant_id()
         backend, distribution = variant.split("-", 1)
         root = Path(__file__).resolve().parents[1]
-        source = Path(info.get("source", root)).resolve()
-        appimage = os.environ.get("APPIMAGE")
         bundle = next((parent for parent in Path(sys.executable).parents if parent.suffix == ".app"), None) if sys.platform == "darwin" else None
-        if distribution == "portable" and sys.platform != "darwin" and not appimage:
-            raise ValueError("Open the AppImage file to update this portable installation.")
-        if distribution == "manual" and not (source / ".git").exists():
-            raise ValueError("The source checkout is missing. Clone the repository again to use source updates.")
-        restart = [appimage, "--connect"] if appimage else [str(bundle / "Contents/MacOS/nothingx"), "--connect"] if bundle else [sys.executable, "-m", "nothingx", "--backend", backend, "--connect"]
-        plan = {"backend": backend, "distribution": distribution, "version": self.manifest["version"], "commit": self.manifest["commit"], "artifact": str(artifact), "sha256": self.artifact["sha256"], "parent": os.getpid(), "root": str(root), "source": str(source), "appimage": appimage, "bundle": str(bundle) if bundle else None, "restart": restart}
+        if distribution == "macos" and bundle is None:
+            raise ValueError("Open the installed macOS app to use app updates.")
+        restart = [str(bundle / "Contents/MacOS/nothingx"), "--connect"] if bundle else [sys.executable, "-m", "nothingx", "--connect"]
+        plan = {"backend": backend, "distribution": distribution, "version": self.manifest["version"], "commit": self.manifest["commit"], "artifact": str(artifact), "sha256": self.artifact["sha256"], "parent": os.getpid(), "root": str(root), "bundle": str(bundle) if bundle else None, "restart": restart}
         plan_path = self.directory / "plan.json"
         plan_path.write_text(json.dumps(plan))
         log = Path.home() / ("Library/Logs/NothingX" if sys.platform == "darwin" else ".cache/nothingx") / "update.log"
         log.parent.mkdir(parents=True, exist_ok=True)
         if getattr(sys, "frozen", False):
-            command = [appimage or sys.executable, "--apply-update", str(plan_path)]
+            command = [sys.executable, "--apply-update", str(plan_path)]
         else:
             helper = self.directory / "apply.py"
             shutil.copy2(Path(__file__).with_name("update_install.py"), helper)

@@ -11,7 +11,7 @@ from nothingx.startup import desktop_argument
 
 source = Path(__file__).resolve().parent
 parser = argparse.ArgumentParser()
-parser.add_argument("--backend", choices=("cpp", "rust"), default=os.environ.get("NOTHINGX_BACKEND", "cpp"))
+parser.add_argument("--backend", choices=("rust",), default="rust")
 parser.add_argument("--prefix", type=Path)
 parser.add_argument("--executable", type=Path)
 args = parser.parse_args()
@@ -29,7 +29,7 @@ launcher = prefix / "bin" / binary.name
 launcher.write_text("#!/bin/sh\nexport NOTHINGX_APP_DIR=" + shlex.quote(str(app_dir)) + "\nexport NOTHINGX_BACKEND=" + backend + "\nexec " + shlex.quote(str(binary)) + ' "$@"\n')
 launcher.chmod(0o755)
 app_id = "io.github.basanta_bhandari.NothingXApplet." + backend.title()
-label = "C++" if backend == "cpp" else "Rust"
+label = "Rust"
 desktop = prefix / "share/applications" / (app_id + ".desktop")
 icon = app_dir / "nothingx/assets/cmf-buds-pro-2/blue_case.png"
 desktop.write_text(f"[Desktop Entry]\nType=Application\nName=Nothing X ({label})\nComment=Nothing and CMF audio controls\nExec={desktop_argument(launcher)}\nIcon={icon}\nTerminal=false\nCategories=COSMIC;\nKeywords=COSMIC;Applet;Bluetooth;Nothing;CMF;\nNoDisplay=true\nX-CosmicApplet=true\nX-CosmicHoverPopup=Auto\nX-OverflowPriority=10\n")

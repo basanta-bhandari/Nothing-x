@@ -107,7 +107,7 @@ class NativeClient(QObject):
         backend = backend_name()
         root = Path(__file__).resolve().parents[1]
         if getattr(sys, "frozen", False):
-            command = [os.environ.get("APPIMAGE", sys.executable), "--service-backend", backend]
+            command = [sys.executable, "--service-backend", backend]
         else:
             command = [sys.executable, "-m", "nothingx.service_entry", "--backend", backend, "--daemon", "--auto"]
         env = {key: value for key, value in os.environ.items() if not key.startswith("_PYI_")}

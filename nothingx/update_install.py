@@ -70,7 +70,7 @@ def refresh_applet(backend):
 
 def apply(plan):
     backend, distribution = plan["backend"], plan["distribution"]
-    if backend not in ("cpp", "rust") or distribution not in ("manual", "portable", "applet"):
+    if backend != "rust" or distribution not in ("macos", "applet"):
         raise ValueError("Unknown update variant.")
     if not re.fullmatch(r"\d+\.\d+\.\d+", plan["version"]):
         raise ValueError("Invalid release version.")
@@ -86,8 +86,8 @@ def apply(plan):
         time.sleep(.5)
     else:
         raise RuntimeError("The application did not close; the update was not applied.")
-    root, source = Path(plan["root"]), Path(plan["source"])
-    if distribution == "portable":
+    root = Path(plan["root"])
+    if distribution == "macos":
         if sys.platform == "darwin":
             result = subprocess.check_output(["hdiutil", "attach", "-readonly", "-nobrowse", "-plist", str(artifact)])
             mount = next(Path(item["mount-point"]) for item in plistlib.loads(result)["system-entities"] if "mount-point" in item)
@@ -99,29 +99,7 @@ def apply(plan):
             finally:
                 run(["hdiutil", "detach", mount])
         else:
-            if not plan.get("appimage"):
-                raise ValueError("The current AppImage path is missing.")
-            replace_file(artifact, Path(plan["appimage"]))
-    elif distribution == "manual":
-        remote = subprocess.check_output(["git", "-C", str(source), "remote", "get-url", "origin"], text=True).strip().removesuffix(".git").lower()
-        if remote not in ("https://github.com/basanta-bhandari/nothing-x", "git@github.com:basanta-bhandari/nothing-x"):
-            raise ValueError("The source checkout points to another repository.")
-        if subprocess.check_output(["git", "-C", str(source), "status", "--porcelain"], text=True).strip():
-            raise ValueError("The source checkout has local changes. Commit or stash them before updating.")
-        run(["git", "-C", source, "fetch", "origin", "tag", "v" + plan["version"]])
-        commit = subprocess.check_output(["git", "-C", str(source), "rev-parse", "FETCH_HEAD^{commit}"], text=True).strip()
-        if commit != plan["commit"]:
-            raise ValueError("The release tag and manifest commit differ.")
-        run(["git", "-C", source, "merge", "--ff-only", "FETCH_HEAD"])
-        run([source / "setup.sh", "--backend", backend], cwd=source)
-        if sys.platform == "darwin":
-            label = "Cpp" if backend == "cpp" else "Rust"
-            built = source / f"build/manual-{backend}/Nothing X {label}.app"
-            if plan.get("bundle") and Path(plan["bundle"]) != built:
-                replace_app(built, Path(plan["bundle"]))
-        elif root != source:
-            prefix = root.parents[1]
-            run([source / ".venv/bin/python", source / "install-local.py", "--backend", backend, "--prefix", prefix])
+            raise ValueError("macOS updates must be installed on macOS.")
     else:
         stage = artifact.parent / "unpacked"
         safe_extract(artifact, stage)
@@ -146,7 +124,7 @@ def restart(plan):
             env.pop(key, None)
     env["PYINSTALLER_RESET_ENVIRONMENT"] = "1"
     root = Path(plan["root"])
-    working = root if plan["distribution"] != "portable" and root.exists() else Path.home()
+    working = root if plan["distribution"] == "applet" and root.exists() else Path.home()
     subprocess.Popen(command, cwd=working, env=env, start_new_session=True)
 
 

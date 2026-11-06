@@ -23,7 +23,7 @@ class Service(QObject):
     event = Signal(dict)
     finished = Signal()
 
-    def __init__(self, backend="cpp", parent=None):
+    def __init__(self, backend="rust", parent=None):
         super().__init__(parent)
         self.engine = Engine(backend)
         self.backend = backend

@@ -11,7 +11,7 @@ from setuptools.command.build_py import build_py
 class Build(build_py):
     def run(self):
         root = Path(__file__).resolve().parent
-        subprocess.run([sys.executable, str(root / "tools/build_backends.py"), "--backend", os.environ.get("NOTHINGX_BACKEND", "cpp")], check=True)
+        subprocess.run([sys.executable, str(root / "tools/build_backends.py")], check=True)
         super().run()
 
 

@@ -1,5 +1,8 @@
 import re
+import os
 import sys
+import asyncio
+import threading
 
 from PySide6.QtCore import QObject, QCoreApplication, QProcess, QTimer, QBluetoothPermission, Qt, Signal
 
@@ -7,12 +10,15 @@ from PySide6.QtCore import QObject, QCoreApplication, QProcess, QTimer, QBluetoo
 class Discovery(QObject):
     devices = Signal(list)
     message = Signal(str, bool)
+    bus_result = Signal(object)
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.process = None
         self.connected = set()
         self.closed = False
+        self.bus_busy = False
+        self.bus_result.connect(self.deliver_bus_devices)
 
     def permission(self, callback):
         if sys.platform != "darwin":
@@ -40,6 +46,9 @@ class Discovery(QObject):
             return
         if sys.platform == "darwin":
             self.mac_devices()
+            return
+        if os.environ.get("FLATPAK_ID"):
+            self.bus_devices()
             return
         if self.process and self.process.state() != QProcess.ProcessState.NotRunning:
             return
@@ -93,6 +102,50 @@ class Discovery(QObject):
         except (ImportError, RuntimeError) as error:
             self.message.emit(f"Bluetooth device listing unavailable: {error}. You can enter the device address manually.", True)
             self.devices.emit([])
+
+    def bus_devices(self):
+        if self.bus_busy:
+            return
+        self.bus_busy = True
+
+        async def scan():
+            from dbus_next import BusType, Message, MessageType
+            from dbus_next.aio import MessageBus
+            bus = await MessageBus(bus_type=BusType.SYSTEM).connect()
+            try:
+                reply = await bus.call(Message(destination="org.bluez", path="/", interface="org.freedesktop.DBus.ObjectManager", member="GetManagedObjects"))
+                if reply.message_type == MessageType.ERROR:
+                    raise RuntimeError("BlueZ device access is unavailable.")
+                devices, connected = [], set()
+                for interfaces in reply.body[0].values():
+                    props = interfaces.get("org.bluez.Device1", {})
+                    if not props or not props.get("Paired") or not props["Paired"].value:
+                        continue
+                    address = props["Address"].value.upper()
+                    name = props.get("Alias") or props.get("Name")
+                    devices.append((address, name.value if name else address))
+                    if props.get("Connected") and props["Connected"].value:
+                        connected.add(address)
+                return devices, connected, ""
+            finally:
+                bus.disconnect()
+
+        def run():
+            try:
+                result = asyncio.run(asyncio.wait_for(scan(), 5))
+            except Exception as error:
+                result = [], set(), str(error)
+            self.bus_result.emit(result)
+        threading.Thread(target=run, daemon=True).start()
+
+    def deliver_bus_devices(self, result):
+        self.bus_busy = False
+        if self.closed:
+            return
+        devices, self.connected, error = result
+        self.devices.emit(sorted(devices, key=lambda item: (not self.matches(item[1]), item[1].lower())))
+        if error:
+            self.message.emit("Bluetooth device listing unavailable: " + error, True)
 
     @staticmethod
     def matches(name):

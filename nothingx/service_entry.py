@@ -8,7 +8,7 @@ import time
 
 def main(arguments=None):
     parser = argparse.ArgumentParser()
-    parser.add_argument("--backend", choices=("cpp", "rust"), default=os.environ.get("NOTHINGX_BACKEND", "cpp"))
+    parser.add_argument("--backend", choices=("rust",), default="rust")
     parser.add_argument("--auto", action="store_true")
     parser.add_argument("--daemon", action="store_true")
     args = parser.parse_args(arguments)

@@ -3,8 +3,8 @@ import json
 import platform
 from pathlib import Path
 
-BACKENDS = ("cpp", "rust")
-DISTRIBUTIONS = ("portable", "applet", "manual")
+BACKENDS = ("rust",)
+DISTRIBUTIONS = ("flatpak", "applet", "macos")
 
 
 def build_info():
@@ -16,14 +16,14 @@ def build_info():
 
 
 def backend_name(value=None):
-    value = value or os.environ.get("NOTHINGX_BACKEND") or build_info().get("backend", "cpp")
+    value = value or os.environ.get("NOTHINGX_BACKEND") or "rust"
     if value not in BACKENDS:
-        raise ValueError("Choose the cpp or rust backend.")
+        raise ValueError("Nothing X now uses the Rust backend. Run ./setup.sh to migrate.")
     return value
 
 
 def variant_id(backend=None, distribution=None):
-    distribution = distribution or os.environ.get("NOTHINGX_DISTRIBUTION") or build_info().get("distribution", "manual")
+    distribution = distribution or os.environ.get("NOTHINGX_DISTRIBUTION") or build_info().get("distribution") or ("macos" if platform.system() == "Darwin" else "flatpak")
     if distribution not in DISTRIBUTIONS:
         raise ValueError("Unknown distribution format.")
     return f"{backend_name(backend)}-{distribution}"
@@ -31,4 +31,4 @@ def variant_id(backend=None, distribution=None):
 
 def package_format(system=None):
     system = system or platform.system()
-    return {"Linux": "AppImage", "Darwin": "dmg"}.get(system)
+    return {"Linux": "flatpak", "Darwin": "dmg"}.get(system)

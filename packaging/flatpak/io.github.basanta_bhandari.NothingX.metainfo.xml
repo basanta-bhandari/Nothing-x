@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.basanta_bhandari.NothingX</id>
+  <name>Nothing X</name>
+  <summary>Desktop controls for Nothing and CMF audio devices</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <description><p>Control noise cancellation, sound presets and supported device features. View battery readings, manage desktop audio and enable a compact desktop widget.</p></description>
+  <launchable type="desktop-id">io.github.basanta_bhandari.NothingX.desktop</launchable>
+  <url type="homepage">https://github.com/basanta-bhandari/Nothing-x</url>
+  <url type="bugtracker">https://github.com/basanta-bhandari/Nothing-x/issues</url>
+  <developer id="io.github.basanta_bhandari"><name>Basanta Bhandari</name></developer>
+  <content_rating type="oars-1.1"/>
+  <supports><control>pointing</control><control>keyboard</control></supports>
+</component>
