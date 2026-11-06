@@ -1,12 +1,19 @@
 name: Rust packages
 on:
   workflow_dispatch:
+    inputs:
+      target:
+        description: Packages to build
+        type: choice
+        default: all
+        options: [all, macos, flatpak]
   push:
     tags: ['v*']
 permissions:
   contents: read
 jobs:
   macos:
+    if: github.event_name != 'workflow_dispatch' || inputs.target != 'flatpak'
     strategy:
       matrix:
         runner: [macos-15, macos-15-intel]
@@ -21,6 +28,10 @@ jobs:
       - run: .venv/bin/python tests/test_beta.py -v
       - run: .venv/bin/python packaging/build-macos.py
       - run: QT_QPA_PLATFORM=offscreen 'dist/macos/Nothing X.app/Contents/MacOS/nothingx' --demo --screenshot /tmp/nothingx-macos.png
+      - name: Check native macOS desktop widget
+        run: |
+          python -c 'import json; from pathlib import Path; Path("/tmp/nothingx-widget-check.json").write_text(json.dumps({"desktop_widget": True}))'
+          QT_QPA_PLATFORM=cocoa NOTHINGX_PREFERENCES=/tmp/nothingx-widget-check.json 'dist/macos/Nothing X.app/Contents/MacOS/nothingx' --demo --screenshot /tmp/nothingx-macos-native.png
       - run: ditto -c -k --sequesterRsrc --keepParent 'dist/macos/Nothing X.app' "dist/NothingX-macos-$(uname -m).app.zip"
       - uses: actions/upload-artifact@v4
         with:
@@ -29,6 +40,7 @@ jobs:
             dist/*.dmg
             dist/*.app.zip
   flatpak:
+    if: github.event_name != 'workflow_dispatch' || inputs.target != 'macos'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
